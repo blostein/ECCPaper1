@@ -4,11 +4,13 @@ This is the code repository for the paper entitled " ".
 To run the pipeline in order
 -- 1a) Run all the code in the DADA2 folders to get asv table + taxa tables + representative asv sequences --
 1) Run Preprocess/PreProcessMaster.R to preprocess 16S amplicon data from dada2 outputs to phyloseq objects
+
 -- 2a) Run DMM_Flux.R to get Dirichlet Multinomial model community state type fits across different k values--
 2) Run Data_reduction/DataReduceMaster.R to take outputs from steps 1) & 2a) and produce 
      - Community state types at k={4, 5, 6}
      - Random forest fits when using transform = {hellinger, clr}   (COHRA data only) 
      - Weighted cooccurrence networks when using transform={hellinger, clr}
+  
 -- 3a) Run the code in the Metasqueeze folder to process whole metagenome data, run humann3 and run metasqueeze (COHRA data only) -- 
 3) Run WGS/WGSMaster.R to take outputs from 3a and put them into nice formats for analysis and graphing in R & 
     run DeSEQ on case vs control abundances of KEGG orthologs and taxa (COHRA data only) 
