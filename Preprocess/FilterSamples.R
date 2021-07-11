@@ -43,7 +43,7 @@ ps@sam_data$ReadLimit=ifelse(sample_sums(ps)>=readlimit, 'pass', 'fail')
 sampleTypeVsReadLimit=ps@sam_data %>% group_by(SampleType, ReadLimit) %>% dplyr::summarise(n=n())
 
 #save
-save(list=c('lessthan1000reads', 'sampleTypeVsReadLimit', 'readcountsByAmp', 'readcountsByType'), file=file.path(output.out, 'DetailedOutput', 'Preprocess', paste0('filtersamples_', readlimit, '.Rdata')), compress=T)
+save(list=c('lessthan1000reads', 'sampleTypeVsReadLimit', 'readcountsByAmp', 'readcountsByType'), file=file.path(output.out, 'Preprocess', paste0('filtersamples_', readlimit, '.Rdata')), compress=T)
 
 #print
 print(paste0('Filtering out all samples with total reads of <', readlimit, ' as well as any samples with that many reads but that were not true samples, and samples that were missing all metadata, of an original ', nsamples(ps), ' samples, ', nsamples(ps_truesamples), ' are left', 
