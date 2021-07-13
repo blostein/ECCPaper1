@@ -25,7 +25,7 @@ Then, any of the .RMD scripts can be run to produce the figures and tables in th
 
 # Description of code in each folder 
 
-Preprocess 
+- Preprocess 
 The code in this folder will run the preprocessing on 16S amplicon data outputs from running DADA2 on the COHRA and PRJ data. 
   steps include 
   
