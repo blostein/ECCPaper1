@@ -25,9 +25,10 @@ Then, any of the .RMD scripts can be run to produce the figures and tables in th
 
 # Description of code in each folder 
 
-- Preprocess 
+Preprocess 
 The code in this folder will run the preprocessing on 16S amplicon data outputs from running DADA2 on the COHRA and PRJ data. 
   steps include 
+  
       1) CreatePhyloSeq.R - take dada2 outputs and make a phyloseq object, including the reference sequences
       2) Decontam.R (COHRA only) - remove contaminant ASVs from phyloseq based on frequency (PicoGreen quantification) & prevalence (negative control) methods, 
       3) FilterSamples.R: 
@@ -40,6 +41,7 @@ The code in this folder will run the preprocessing on 16S amplicon data outputs 
       
 - Data_reduction
 The code in this folder will take phyloseq objects from Preprocess step and run:
+
      1) CreateNetwork.R - make a weighted correlation network for the clr/hellinger transformed asv matrix.  resulting objects include:
           a) number of modules created
           b) intraStats, network stats (centrality, betweenness) for each taxa and what network each taxa belongs to
@@ -54,11 +56,13 @@ The code in this folder will take phyloseq objects from Preprocess step and run:
  - WGS (COHRA only) 
  The code in this folder will take outputs from metasqueeze and humann3 and put them into nicer formats for R. 
  It will also run DeSeq2 on taxa/KEGG abudances (case vs control) 
+ 
      1) cleanHumannData.R: take .tsvs from humann3 output and create object containining information on taxa abundance, path abundance and path coverage
      2) slimSQMObjects.R: take large SQM object and separate out important tables for futher analysis (taxa, function abundance) 
      3)runWGSDeSeq.R: Run Deseq2 to identify taxa/keggs that are differentially abundance between cases and controls 
      
  - Analysis 
   The code in this folder is just helper codes that get used multiple times in the analysis or are large and interupt the flow of reading the Results/Supplement.Rmd
+  
      1) sampleLoss.R - creates figure and table that tracks count of samples that have/are missing metadata; saliva sample data (16S), plaque/saliva sample (WGS)and performs sanity checks on sample counts
      2) createTidyGraph.R - take in correlation graph information and manipulates it into a tidy graph object which is nicer to work with 
