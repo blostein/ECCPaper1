@@ -52,13 +52,17 @@ ps_mock_bar=plot_grid(
   plot_bar(subset_samples(ps_mock, AmplificationStatus=='Pass'), 'Plate', 'Abundance', 'Genus')+facet_wrap(~Run, scales='free_x')+theme_bw()+theme(legend.position = 'none')+theme(axis.text.x = element_text(angle = 45, vjust = .4)), 
   ggplot(data=mock_true, aes(x=Name, y=X16S.Only/100, fill=SciName))+theme_bw()+geom_bar(position="stack", stat="identity", width=.4, color="black")+scale_x_discrete(name="", labels=c("True mock"))+theme(legend.text = element_text(face="italic"), legend.title=element_blank(), legend.position = "right")+scale_y_continuous(name="")+facet_wrap(~Name)+theme(axis.text.x = element_text(angle = 45, vjust = .4)),
   align='h', axis = 'tb', rel_widths = c(1, 1))
+weirdmock=subset_taxa(subset_samples(phy.asv, AmplificationStatus=='Fail' & SampleType=='Mock'), taxa_sums(subset_samples(phy.asv, AmplificationStatus=='Fail' & SampleType=='Mock'))>0)
+weirdmock_bar=plot_bar(weirdmock, 'Abundance', 'Genus', 'Genus')+theme_bw()+theme(legend.position = 'none', axis.text.y = element_text(face='italic'))
 
 #plot extraction controls
 Extractionkit<-subset_taxa(subset_samples(ps, SampleType=="Extraction"), taxa_sums(subset_samples(ps, SampleType=="Extraction"))>0)
-
-
+#plot weird water sample
+weirdwater=subset_taxa(subset_samples(morethan1000reads, SampleType=='Water'), taxa_sums(subset_samples(morethan1000reads, SampleType=='Water'))>0)
+weirdwater_bar=plot_bar(weirdwater, 'Abundance', 'Genus', 'Genus')+theme_bw()+theme(legend.position = 'none', axis.text.y = element_text(face='italic'))
 #save
-save(list=c('lessthan1000reads', 'sampleTypeVsReadLimit', 'readcountsByAmp', 'readcountsByType', 'readcountsbyType_preDecontam', 'ps_mock_bar'), file=file.path(output.out, 'Preprocess', paste0('filtersamples_', readlimit, '.Rdata')), compress=T)
+save(list=c('lessthan1000reads', 'sampleTypeVsReadLimit', 'readcountsByAmp', 'readcountsByType', 'readcountsbyType_preDecontam', 'ps_mock_bar', 'weirdwater_bar'), 
+     file=file.path(output.out, 'Preprocess', paste0('filtersamples_', readlimit, '.Rdata')), compress=T)
 
 #print
 print(paste0('Filtering out all samples with total reads of <', readlimit, ' as well as any samples with that many reads but that were not true samples, and samples that were missing all metadata, of an original ', nsamples(ps), ' samples, ', nsamples(ps_truesamples), ' are left', 

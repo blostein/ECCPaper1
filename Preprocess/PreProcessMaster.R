@@ -63,6 +63,15 @@ ps_meta_nodups<-ps.filter
 ps_meta_nodups@sam_data<-sample_data(meta2)
 save(ps_meta_nodups, file=file.path(data.out, 'phyloseq', 'phyasv_meta.Rdata'))
 
+#save data on read counts, sample loss and parameters 
+list_ps=list(phy.asv, phy.asv_decontam, lessthan1000reads, morethan1000reads, ps_truesamples, ps.filter)
+taxa_count=lapply(list_ps, function(x) ntaxa(x)); names(taxa_count)=c('all', 'decontam', 'lessthan1000', 'morethan1000', 'truesamples', 'taxafilter')
+sample_count=lapply(list_ps, function(x) table(x@sam_data$SampleType))
+names(sample_count)=c('all', 'decontam', 'lessthan1000', 'morethan1000', 'truesamples', 'taxafilter')
+save(list=c('readlimit', 'abund.filter', 'prev', 'decontam.thresh', 'taxa_count', 'sample_count'), 
+     file=file.path(output.out, 'Preprocess', paste0('preprocessParamsStats_', readlimit, '.Rdata')), compress=T)
+
+
 ################################################################################################
 #Run PRJ
 ################################################################################################
