@@ -24,4 +24,4 @@ save(list=c('saliva_kegg_abund', 'plaque_kegg_abund',
        'saliva_kegg_names', 'plaque_kegg_names'), 
      file=file.path(data.out, 'MS', 'kegg_and_taxa_slim.Rdata'))
 
-rm(saliva); rm(plaque)
+rm(saliva)
