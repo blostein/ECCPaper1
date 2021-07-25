@@ -104,36 +104,31 @@ Postnatal$Dentobuff<-recode_factor(Postnatal$Dentobuff, `111`="Failed", `1`="Blu
 Postnatal<-Postnatal %>% select(-Education)
 #How many visits does each person have (limit to up to visit 10, as that is the limit of the saliva samples)? 
 Postnatal<-Postnatal %>% group_by(BabySubjectID) %>% filter(Visit<=10) %>% add_tally() 
-Postnatal %>% filter(n<3) %>% select(BabySubjectID, Visit, Prim_d1ft)
-#individual 21000438 has visits 8 and 7 and no decay
+
 
 ##############Postnatal and prenatal merge
 #make metadata dataset with prenatal and postnatal information 
 MetaVisit<-left_join(Prenatal, Postnatal)
 MetaVisit$COHRAID<-paste(MetaVisit$BabySubjectID, '-', MetaVisit$Visit, sep='')
-#how many controls eventually had decay at or before the V10 but were NOT included in this study as cases?
+#how many controls eventually had decay at or before the V10 but were NOT included in this study as cases (hadn't had those visits at the time of ?
 MetaVisit %>% filter(CaseStatus=="Control (post-incident visit)" & Decay=="Decay present (d1ft>0)") %>% select(BabySubjectID, IncidentVisit, Visit, Decay, Prim_d1ft) %>% unique()
-#   BabySubjectID IncidentVisit Visit   Decay                      Prim_d1ft
-#2      11000326             8    10    Decay present (d1ft>0)         4
-#3      11000320             8    10    Decay present (d1ft>0)         4
-#4      11000444             8    10    Decay present (d1ft>0)         1
-#5      21000386             8     9    Decay present (d1ft>0)         8
 EverDecay<-MetaVisit %>% filter(Visit<=10 & Prim_d1ft>0)%>%pull(BabySubjectID)%>%unique()
 MetaVisit$DecayBy10=ifelse(MetaVisit$BabySubjectID %in% EverDecay, 'Yes', 'No')
 #MetaVisit saliva pH
-#ggplot(MetaVisit, aes(x=1, y=SalivapH))+geom_boxplot()
 MetaVisit$SalivapH=ifelse(MetaVisit$SalivapH<2.5, NA, MetaVisit$SalivapH)
 dir.create(file.path(data.out, 'Metadata'))
 #add foxcavid 
 load(file.path(data.out, 'phyloseq', 'phyasv_truesamples.Rdata'))
 m=as.data.frame(as.matrix(ps_truesamples@sam_data))%>%select(FoxCavID, COHRAID)
 MetaVisit_new=left_join(MetaVisit, m)
+#check sample size
 if(nrow(MetaVisit_new)==nrow(MetaVisit)){MetaVisit=MetaVisit_new}; if(nrow(MetaVisit_new)!=nrow(MetaVisit)){print("STOP: check n")}
 #remove one subject who has only one metavisit record & no FoxCavID (i.e. no metagenomics samples) 
 StrangeID=MetaVisit%>%group_by(BabySubjectID)%>%dplyr::summarise(n=n())%>%filter(n==1)%>%pull(BabySubjectID) 
 MetaVisit=MetaVisit %>%filter(BabySubjectID!=StrangeID)
+#chek sample size
 if(nrow(MetaVisit_new)-1 != nrow(MetaVisit)){print("STOP:check n")}
-#Make a column that denotes if there is a saliva sample 
+#Make a column that denotes if there is a clean 16S saliva sample 
 HasCleanSample<-data.frame('COHRAID'=c(ps_truesamples@sam_data$COHRAID))%>%mutate(HasCleanSample=1)
 MetaVisit<-left_join(MetaVisit, HasCleanSample)
 MetaVisit$UniquePersonID %>% unique() %>% length() #191 
@@ -146,192 +141,3 @@ weirdPerson<-gsub('-.*', '', weirdIDs, )%>%unique()
 MetaVisit$IncidentVisit2<-ifelse(MetaVisit$BabySubjectID == weirdPerson, 10, MetaVisit$IncidentVisit)
 #save MetaVisit
 save(MetaVisit, file=file.path(data.out, 'Metadata', 'MetaVisit.Rdata'))
-
-
-#####################Phone call interview data
-#USCUR 
-USCUR<-USCUR %>% dplyr::mutate(PhoneCall=factor(recode(as.numeric(PhCall), '1' = '10 wk call', '2'= '6 mo call', '3'='12 mo call', '4'='18 mo call', 
-                                                '5'='24 mo call', '6'= '30 mo call', '7'='36 mo call', '8'='42 mo call', '9'='48 mo call', 
-                                                '10'='54 mo call', '11'='60 mo call', '12'='66 mo call', '13'= '72 mo call'), 
-                                         levels=c("10 wk call", "6 mo call", "12 mo call", "18 mo call", "24 mo call", "30 mo call", "36 mo call",
-                                                  "42 mo call", "48 mo call", "54 mo call", "60 mo call", "66 mo call", "72 mo call")))%>%
-  dplyr::mutate(CallDate=as.Date(CallDate, format="%m/%d/%y"))
-
-# 1-4 houskeeping
-#5-9 bf and bm 
-#10-49 diet
-#50-58 tooth hygiene 
-
-#Date CallDate
-
-#BF variables Q35 
-BF<-USCUR %>% select(MotherSubjectID, BabySubjectID, PhCall, CallDate, Q35_Breastfed, Q35a_BFCurrent, Q35b_BFStopMnth, Q35b_BFStopWks, Q37a_BMCurrent)
-BF %>% select(BabySubjectID) %>% unique() %>% dim() # 189 total ids 
-BF<-left_join(BF, Prenatal %>% select(MotherSubjectID, BabySubjectID, BabyBirthdate))
-BF$CallDate<-as.Date(BF$CallDate, format="%m/%d/%y")
-class(BF$CallDate)
-BF %>% filter(is.na(CallDate)) %>% dim() # 2 missing call date 
-BF %>% filter(is.na(CallDate))
-BF<-BF %>% filter(!is.na(CallDate)) # remove
-table(BF$Q35b_BFStopMnth)
-BF$Q35b_BFStopMnth<-str_replace_all(BF$Q35b_BFStopMnth, c(" months" = "", " month"="", " months"= "", " MONTHS"=""))
-table(BF$Q35b_BFStopMnth)
-table(BF$Q35b_BFStopWks)
-BF<-BF %>% mutate_at(vars(contains("Q35b_BFStop")), funs(na_codes(.,-9999, 88)))%>% mutate_at(vars(contains("Q35b_BFStop")), funs(as.numeric(.)))
-BF_StopDate<-BF %>% filter((!is.na(Q35b_BFStopMnth)) | !is.na(Q35b_BFStopWks))
-BF_StopDate %>% dim()
-BF_StopDate %>% select(BabySubjectID) %>% unique() %>% dim() # no repeated ids, ever
-#individual with a stop date given has only one stop date given 
-a<- BF %>% filter(!(BabySubjectID %in% BF_StopDate$BabySubjectID))
-No <- a %>% filter(Q35_Breastfed==2)
-Yes <- a  %>% filter(Q35_Breastfed==1)
-Mixed1<-unique(No[No$BabySubjectID %in% Yes$BabySubjectID,1])
-Mixed2<-unique(Yes[Yes$BabySubjectID %in% No$BabySubjectID,1])
-Mixed1==Mixed2 # good
-Never <- unique(No[!(No$BabySubjectID %in% Yes$BabySubjectID), 1])
-Always<- unique(Yes[!(Yes$BabySubjectID %in% No$BabySubjectID), 1])
-length(Never)+length(Always)+length(Mixed1)==dim(a %>% select(BabySubjectID) %>% unique())[1]
-length(Never)+length(Always)+length(Mixed1)+(BF_StopDate %>% select(BabySubjectID) %>% unique() %>% dim())[1] ==189
-#make new variables Type and BFDate
-BF_StopDate<-left_join(BF_StopDate %>% dplyr::mutate(Type="BF stop date known", BFDate = BabyBirthdate %m+% months(Q35b_BFStopMnth)+ ifelse(is.na(Q35b_BFStopWks), 0, weeks(Q35b_BFStopWks))) %>% select(BabySubjectID, Type, BFDate), BF)
-BF_Never<-BF %>% filter(MotherSubjectID %in% Never) %>% dplyr::mutate(Type="BF never", BFDate=BabyBirthdate)
-LastYesDate<-BF %>% filter(MotherSubjectID %in% Mixed1 & Q35_Breastfed==1) %>%
-  group_by(BabySubjectID) %>%
-  top_n(n=1, wt=CallDate)
-FirstNoDate<-BF %>% filter(MotherSubjectID %in% Mixed1 & Q35_Breastfed==2) %>% 
-  group_by(BabySubjectID) %>% 
-  top_n(n=1, wt=rev(CallDate))
-dim(LastYesDate)
-dim(FirstNoDate)
-FirstNoDate$CallDate>LastYesDate$CallDate
-WrongMixed<-FirstNoDate[(FirstNoDate$CallDate>LastYesDate$CallDate)==F, ]
-BF %>% filter(BabySubjectID == WrongMixed$BabySubjectID) # all 1s except the one that is a 2 
-# move to always 
-LastAlways<- BF %>% filter(MotherSubjectID %in% c(Always, WrongMixed$MotherSubjectID) & Q35a_BFCurrent==1)%>%
-  group_by(BabySubjectID) %>% 
-  top_n(n=1, wt=CallDate)%>% dplyr::mutate(Type="BF always", BFDate=CallDate) %>% select(BabySubjectID, Type, BFDate)
-BF_Always<-left_join(BF %>% filter(MotherSubjectID %in% c(Always, WrongMixed$MotherSubjectID)), LastAlways)
-# make mixed and remove 
-MixedDate=LastYesDate$CallDate + floor((FirstNoDate$CallDate-LastYesDate$CallDate)/2)
-BF_Mixed<-left_join(left_join(FirstNoDate %>% dplyr::mutate(Type="BF stop date unknown") %>% 
-                                filter(BabySubjectID != WrongMixed$BabySubjectID) %>% select(BabySubjectID, CallDate, Type), 
-                              LastYesDate %>% dplyr::mutate(LastYesDate=CallDate) %>% select(BabySubjectID, LastYesDate))%>%
-                      dplyr::mutate(BFDate=LastYesDate+floor((CallDate-LastYesDate)/2)) %>% select(BabySubjectID, BFDate, Type), BF)
-
-(BF_Mixed %>% select(BabySubjectID) %>% unique()%>%dim())[1]==length(Mixed1[Mixed1!=WrongMixed$MotherSubjectID])
-#rejoin
-BF2<-rbind(BF_Always, BF_Never, BF_StopDate, BF_Mixed)
-BF2$BFDuration<-BF2$BFDate-BF2$BabyBirthdate
-BF2$BFDurationCat<-cut(as.numeric(BF2$BFDate-BF2$BabyBirthdate), c(0, 30, 180, 365, 5000), include.lowest = T, labels=c("Never or for <=1 month", ">1 month & <=6 months", ">6 months & <=12 months", ">12 months"))
-with(BF2, table(Type, BFDurationCat))
-BF3<-BF2 %>% select(MotherSubjectID, BabySubjectID, Type, BFDate, BFDuration, BFDurationCat)%>%unique()
-with(BF3, table(Type, BFDurationCat))
-
-
-#oral hygiene 
-OH<-USCUR %>% select(MotherSubjectID, BabySubjectID, PhCall, CallDate, Q48a_WipeTeeth, Q48a_WipeTeeth1, Q48a_WipeTeeth2, 
-                     Q48a_WipeTeeth3, Q48a_WipeTeeth4, Q48b_WipeFreq, Q48f_BrushSelf, Q48f_BrushSelfFreq, Q48c_Toothpaste, Q48d_Fluoride)
-#figuring out the weirdness of Q48a_WipeTeeth1-4:
-# in DD, 1 is "Yes brush", 2 is "No", 3 is "DK", 4 is "Yes Wipe" 
-#for all, 1 is yes and 0 is no 
-with(OH, table(Q48a_WipeTeeth1, Q48a_WipeTeeth2))
-# no one who says 'yes' to 1 also says yes to 2
-with(OH, table(Q48a_WipeTeeth1, Q48a_WipeTeeth3))
-#2 people who say yes to 1 say yes to 3
-with(OH, table(Q48a_WipeTeeth1, Q48a_WipeTeeth4))
-#6 people who say yes to 1 also say yes to 4
-#conclusion: just use 1... need the b variable (frequency) 
-table(OH$Q48a_WipeTeeth, OH$Q48a_WipeTeeth1)# for 48a 1 is yes,2  is no, and 9 or -9999 is missing, for 48a1, 0 is no, 1 is yes
-#use either yes to Q48a or yes to 48a1 
-OH$BrushTeeth<-with(OH, ifelse(Q48a_WipeTeeth==1 | Q48a_WipeTeeth1==1, "Yes", ifelse(Q48a_WipeTeeth==2 | Q48a_WipeTeeth1==0, "No", "Missing")))
-OH<-OH %>% dplyr::mutate(BrushTeethFreq=factor(case_when(BrushTeeth=="Yes" & Q48b_WipeFreq<5 & Q48b_WipeFreq>0 ~ "Less than once a day", 
-                                                  BrushTeeth=="Yes" & Q48b_WipeFreq==5~ "Once a day", 
-                                                  BrushTeeth=="Yes" & Q48b_WipeFreq %in% c(6, 7)~ "More than once a day", 
-                                                  BrushTeeth=="Yes" & Q48b_WipeFreq==0~ "Yes, frequency not given", 
-                                                  BrushTeeth=="Yes" & Q48b_WipeFreq==9~ "Yes, frequency not given",
-                                                  BrushTeeth=="Yes" & Q48b_WipeFreq==-9999~ "Yes, frequency not given",
-                                                  BrushTeeth=="No" & Q48b_WipeFreq==-9999 ~"No", 
-                                                  BrushTeeth=="Missing"~"Missing"), levels=c("Missing", "No", "Less than once a day", "Once a day", "More than once a day", "Yes, frequency not given")))
-with(OH, table(BrushTeeth, BrushTeethFreq))
-with(OH, table(Q48f_BrushSelf, Q48f_BrushSelfFreq))
-OH<-OH %>% dplyr::mutate(BrushSelf = factor(case_when(Q48f_BrushSelf==-9999 | Q48f_BrushSelf==9 ~ "Missing", 
-                                               Q48f_BrushSelf==2 ~ "No", 
-                                               Q48f_BrushSelf==1 & Q48f_BrushSelfFreq<5 ~ "Less than once a day", 
-                                               Q48f_BrushSelf==1 & Q48f_BrushSelfFreq==5 ~ "Once a day", 
-                                               Q48f_BrushSelf==1 & Q48f_BrushSelfFreq>5 ~ "More than once a day"), 
-                                     levels=c("Missing", "No", "Less than once a day", "Once a day", "More than once a day")))%>%
-  dplyr::mutate(Toothpaste=factor(case_when(Q48c_Toothpaste==-9999| Q48c_Toothpaste==9 ~ "Missing", 
-                                     Q48c_Toothpaste==2 ~ "No", 
-                                     Q48c_Toothpaste==1 & Q48d_Fluoride==1~ "Yes, w/ fluoride", 
-                                     Q48c_Toothpaste==1 & Q48d_Fluoride==2~ "Yes, w/o fluoride", 
-                                     Q48c_Toothpaste==1 & Q48d_Fluoride==9~ "Yes, unknown fluoride status"), levels = c("Missing", "No", "Yes, w/ fluoride", "Yes, w/o fluoride", "Yes, unknown fluoride status")))
-with(OH, table(BrushSelf, Q48c_Toothpaste)) # 1 is yes, 2 is no 9 and -9999 is missing
-with(OH, table(BrushTeeth, Q48c_Toothpaste))
-with(OH, table(BrushTeeth, BrushSelf, Q48c_Toothpaste))
-with(OH, table(Q48c_Toothpaste, Q48d_Fluoride))
-with(OH, table(BrushTeeth, BrushSelf, Toothpaste))
-
-with(OH, table(BrushTeethFreq, BrushSelf))
-OH<-OH %>% dplyr::mutate(TeethBrushed=factor(case_when(BrushSelf=="More than once a day" | BrushTeethFreq=="More than once a day"~"More than once a day",
-                                                BrushSelf!="More than once a day" & BrushTeethFreq!="More than once a day" & (BrushSelf=="Once a day"|BrushTeethFreq=="Once a day")~"Once a day", 
-                                                BrushSelf!="More than once a day" & BrushTeethFreq!="More than once a day" & BrushSelf!="Once a day" & BrushTeethFreq!="Once a day"& (BrushSelf=="Less than once a day"| BrushTeethFreq=="Less than once a day")~"Less than once a day", 
-                                                BrushTeethFreq=="No" & BrushSelf%in%c("Missing", "No")~"No", 
-                                                BrushTeethFreq=="Missing" & BrushSelf=="Missing" ~"Missing"), 
-                                      levels=c("Missing", "No", "Less than once a day", "Once a day", "More than once a day")))
-
-#Diet 
-Diet<-USCUR[,c(1:5, 11:50, 61)]
-Diet<-Diet %>% mutate_at(vars(matches("Q38|Q43|Q42")), funs(as.factor(.)))
-table(Diet$PhoneCall)
-Diet %>% group_by(BabySubjectID) %>% dplyr::summarise(n=n()) %>% select(n) %>% table()
-#Diet %>% group_by(BabySubjectID) %>% dplyr::summarise(n=n()) %>% select(n)%>%hist()
-
-BabyFood<-Diet %>% select(BabySubjectID, Q42_BabyFood, PhoneCall, CallDate) %>% arrange(BabySubjectID, CallDate) %>% group_by(BabySubjectID) %>% 
-  filter(Q42_BabyFood %in% c(1, 4)) %>% dplyr::slice(1)%>%dplyr::mutate(FirstBabyFood=case_when(PhoneCall=="10 wk call"~"At 10 wk call", 
-                                                                                  PhoneCall=="6 mo call"~"At 6 mo call", 
-                                                                                  PhoneCall%in% c("12 mo call", "18 mo call", "24 mo call")~"At or after 12 mo call"))%>%
-  select(BabySubjectID, FirstBabyFood)
-with(BabyFood, table(FirstBabyFood))
-
-Diet<-Diet %>% mutate_at(vars("Q38b_LiquidFormula", 'Q38c_PowderFormula', 'Q38d_CowAnimalMilk', 'Q38i_Juice', 'Q38l_Soda', 'Q43j_EatDesserts'), funs(new=factor(case_when(. %in% c(9, -9999, 1)~"Never or once", 
-                                                                                                                                                                          .==2~"Every few days", .==3~"Once per day", .==4~"Several times per day"), 
-                                                                                                                                                                levels=c("Never or once", "Every few days", "Once per day", "Several times per day"))))
-#SSB
-#variables to use "Q38g_FlavWater" "Q38g_FlavWaterSweet"    "Q38h_SportsDrink"      
-# "Q38h_SportsSweet"       "Q38i_Juice" "Q38ii_JuiceWat"         "Q38j_JuiceDrink"  
-#"Q38j_JuiceDrinksweet"   "Q38k_PowderMix" "Q38k_PowderMixSweet"    "Q38l_Soda"            
-#"Q38l_SodaSweet"         "Q38m_Coffee" "Q38m_CoffeeSweet"       "Q38n_Tea"               
-#"Q38n_TeaSweet"          "Q38o_MealDrink" "Q38o_MealDrinkSweet"    "Q38p_EnergyDrink" 
-#"Q38p_EnergyDrinkSweet"
-with(Diet, xtabs(~Q38g_FlavWater+Q38g_FlavWaterSweet))
-with(Diet, xtabs(~Q38n_Tea+Q38n_TeaSweet))
-with(Diet, xtabs(~Q38l_Soda+Q38l_SodaSweet))
-#Take beveragesthat can be sugar sweetened. If they are sugar sweetened, sum across all SSB weekly frequencies
-#if not SS (or missing SS info), treat frequency as 0. then z score standardize 
-#SSBScore includes only beverages with SS info. 
-#SSBScore2 includes these beverages and juice and watered juice frequency. 
-
-SSB<-Diet[, c(1, 2, 3, 4, 12:15, 18:31)]
-var_freq<-colnames(SSB)[seq(5, 22, by=2)]
-var_sweet<-colnames(SSB)[seq(6, 22, by=2)]
-var_new<-paste(var_freq, '_new', sep='')
-for(i in seq(1:9)){
-  SSB<-SSB %>% dplyr::mutate(!!sym(var_new[i]):=case_when(!!sym(var_sweet[i])==1~as.numeric(as.character(!!sym(var_freq[i]))), 
-                                                          !!sym(var_sweet[i])!=1~0)) 
-}
-#check
-with(SSB, xtabs(~Q38l_Soda+Q38l_Soda_new+Q38l_SodaSweet))
-with(SSB, xtabs(~Q38n_Tea+Q38n_Tea_new+Q38n_TeaSweet))
-with(SSB, xtabs(~Q38g_FlavWater+Q38g_FlavWater_new+Q38g_FlavWaterSweet))
-#make z score standardizations of summed variables. 
-SSB$SSBScore<-as.vector(scale(SSB %>% select(contains("new"))%>%rowSums(.)))
-SSB$SSBScore2<-as.vector(scale(left_join(SSB, Diet %>% select(BabySubjectID, PhCall, Q38i_Juice, Q38ii_JuiceWat)%>%mutate_at(vars(contains("Juice")), funs(new=case_when(.%in%c(-9999, 1,9)~0,!(.%in%c(-9999,1,9))~as.numeric(as.character(.))))))%>%
-                                 select(contains("new"))%>%rowSums(.)))
-#check correlation
-#ggplot(SSB, aes(x=SSBScore, y=SSBScore2, color=as.factor(Diet$Q38i_Juice)))+geom_point()  
-
-#join together
-Diet2<-left_join(left_join(Diet, SSB %>% select(BabySubjectID, PhCall, SSBScore, SSBScore2)), MetaVisit %>% select(BabySubjectID, Case)) 
-CallData<-left_join(left_join(BF3, OH), left_join(left_join(Diet, BabyFood), SSB%>% select(BabySubjectID, PhCall, SSBScore, SSBScore2)))
-save(CallData, file=file.path(data.out, 'Metadata', 'CallDataUSCUR.Rdata'))
-

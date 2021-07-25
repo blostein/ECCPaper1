@@ -8,6 +8,7 @@ library(dplyr)
 library(decontam)
 library(stringr)
 library(ggplot2)
+library(cowplot)
 ################################################
 ################################################Directory based coding 
 #prj directory

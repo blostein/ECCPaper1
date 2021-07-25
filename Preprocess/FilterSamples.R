@@ -49,7 +49,7 @@ mock_true$SciName=paste(mock_true$Genus, mock_true$Species)
 mock_true$Name="ZymoBIOMIC D6306"
 ps_mock =transform_sample_counts(subset_taxa(subset_samples(phy.asv, SampleType=="Mock"), taxa_sums(subset_samples(phy.asv, SampleType=="Mock"))>50), function(OTU) OTU/sum(OTU))
 ps_mock_bar=plot_grid(
-  plot_bar(subset_samples(ps_mock, AmplificationStatus=='Pass'), 'Plate', 'Abundance', 'Genus')+facet_wrap(~Run, scales='free_x')+theme_bw()+theme(legend.position = 'none')+theme(axis.text.x = element_text(angle = 45, vjust = .4)), 
+  plot_bar(ps_mock, 'Plate', 'Abundance', 'Genus')+facet_wrap(~Run, scales='free_x')+theme_bw()+theme(legend.position = 'none')+theme(axis.text.x = element_text(angle = 45, vjust = .4)), 
   ggplot(data=mock_true, aes(x=Name, y=X16S.Only/100, fill=SciName))+theme_bw()+geom_bar(position="stack", stat="identity", width=.4, color="black")+scale_x_discrete(name="", labels=c("True mock"))+theme(legend.text = element_text(face="italic"), legend.title=element_blank(), legend.position = "right")+scale_y_continuous(name="")+facet_wrap(~Name)+theme(axis.text.x = element_text(angle = 45, vjust = .4)),
   align='h', axis = 'tb', rel_widths = c(1, 1))
 weirdmock=subset_taxa(subset_samples(phy.asv, AmplificationStatus=='Fail' & SampleType=='Mock'), taxa_sums(subset_samples(phy.asv, AmplificationStatus=='Fail' & SampleType=='Mock'))>0)

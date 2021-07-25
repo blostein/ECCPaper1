@@ -15,11 +15,9 @@ dna <- Biostrings::DNAStringSet(taxa_names(phy.asv))
 names(dna) <- taxa_names(phy.asv)
 phy.asv <- merge_phyloseq(phy.asv, dna)
 taxa_names(phy.asv) <- paste0("ASV", seq(ntaxa(phy.asv)))
-#add plate data
-phy.asv@sam_data$Run=ifelse(phy.asv@sam_data$Plate %in% paste('Plate', c(1, 2, 3, 4)), 'Run 1',
-                       ifelse(phy.asv@sam_data$Plate %in% paste('Plate', c(5, 6, 7, 8)), 'Run 2', 
-                        ifelse(phy.asv@sam_data$Plate%in% paste('Plate', c(9, 10, 11, 12)), 'Run 3',
-                                     NA)))
+#pretty up the run/batch label for later plotting 
+if(amp_data==T){phy.asv@sam_data$Run=paste0('Run ', phy.asv@sam_data$Batch)}
 
+#save output
 dir.create(file.path(data.out, 'phyloseq'))
 save(phy.asv, file=file.path(data.out, 'phyloseq', "phyasv.Rdata"))

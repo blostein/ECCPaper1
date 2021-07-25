@@ -28,3 +28,5 @@ metadata$Plate<-factor(paste("Plate ", metadata$Plate, sep=''), levels=c("Plate 
 metadata$DNAQuant1000<-ifelse(metadata$DNAQuant<=0.01, 0.01, metadata$DNAQuant)*100
 rownames(metadata)<-metadata$FoxCavID
 save(metadata, file="/Volumes/EPID/FACULTY/FOXMAN/Freida Blostein/CAVITIES_meta/MetaData/OriginalMetaData/SeqToCOHRAKey.Rdata")
+#save(metadata, file=file.path(meta.data, "SeqToCOHRAKey.Rdata"))
+#save(metadata, file="/Volumes/EPID/FACULTY/FOXMAN/COHRA II/ECCRerun/OGData/COHRA/Metadata/SeqToCOHRAKey.Rdata")
