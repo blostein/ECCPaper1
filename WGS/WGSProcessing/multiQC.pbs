@@ -1,0 +1,28 @@
+#!/bin/bash
+# The interpreter used to execute the script
+
+#“#SBATCH” directives that convey submission options:
+
+#SBATCH --job-name=multiQC
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=2g
+#SBATCH --time=8:00:00
+#SBATCH --account=bfoxman1
+#SBATCH --partition=standard
+#SBATCH --output=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Code/CleanPipe/%x-%j.log
+
+
+trim_dir=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Files/CleanPipe/PostTrim/FASTQC/
+decontam_dir=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Files/CleanPipe/PostHR/FASTQC/
+out_dir=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Results/multiQCresults
+
+module load Bioinformatics
+source activate multiqc
+
+multiqc -f ${trim_dir}*_paired_fastqc* -n pairedPosttrim -o ${out_dir}
+multiqc -f ${trim_dir}*unpaired_fastqc* -n unpairedPosttrim -o ${out_dir}
+
+multiqc -f ${decontam_dir}*_paired_decon_fastqc* -n pairedPostHR -o ${out_dir}
+multiqc -f ${decontam_dir}*unpaired_decon_fastqc* -n unpairedPostHR -o ${out_dir}

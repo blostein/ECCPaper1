@@ -1,0 +1,33 @@
+#!/bin/bash
+# The interpreter used to execute the script
+
+#“#SBATCH” directives that convey submission options:
+
+#SBATCH --job-name=assembly_plaque
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=128g
+#SBATCH --time=48:00:00
+#SBATCH --account=bfoxman1
+#SBATCH --partition=standard
+#SBATCH --output=/scratch/bfoxman_root/bfoxman/blostein/metasqueeze_db/Code/%x-%j.log
+
+source /home/${USER}/.bashrc
+source activate SqueezeMeta
+
+cd /scratch/bfoxman_root/bfoxman/blostein/metasqueeze_db/
+
+export http_proxy=http://proxy.arc-ts.umich.edu:3128/
+export FTP_PROXY=http://proxy.arc-ts.umich.edu:3128/
+export ftp_proxy=http://proxy.arc-ts.umich.edu:3128/
+export HTTPS_PROXY=http://proxy.arc-ts.umich.edu:3128/
+export https_proxy=http://proxy.arc-ts.umich.edu:3128/
+export HTTP_PROXY=http://proxy.arc-ts.umich.edu:3128/
+
+reads=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Files/CleanPipe/PostHR/
+samplefile=/scratch/bfoxman_root/bfoxman/blostein/metasqueeze_db/Code/plaque_samples.txt
+projectname=plaque_assembly
+
+/home/blostein/.conda/envs/SqueezeMeta/bin/SqueezeMeta.pl -m coassembly -p $projectname  -s $samplefile  -f $reads -c 1000
+

@@ -1,0 +1,23 @@
+#!/bin/bash
+# The interpreter used to execute the script
+
+#“#SBATCH” directives that convey submission options:
+
+#SBATCH --job-name=MergeTSVs_metaphlanH3
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=7g
+#SBATCH --time=100:00:00
+#SBATCH --account=bfoxman1
+#SBATCH --partition=standard
+#SBATCH --output=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Humann2/Code/%x-%j.log
+
+
+#source activate biobakery
+source activate biobakery3
+module load R
+
+cd /scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Humann2/Files/humann3_output
+
+merge_metaphlan_tables.py ./*/*_metaphlan_bugs_list.tsv > merged_metaphlan_abundance_table.tsv

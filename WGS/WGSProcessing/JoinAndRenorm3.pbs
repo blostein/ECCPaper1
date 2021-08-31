@@ -1,0 +1,39 @@
+#!/bin/bash
+# The interpreter used to execute the script
+
+#“#SBATCH” directives that convey submission options:
+
+#SBATCH --job-name=JoinRenorm3
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=14g
+#SBATCH --time=100:00:00
+#SBATCH --account=bfoxman1
+#SBATCH --partition=standard
+#SBATCH --output=/scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Humann2/Code/%x-%j.log
+
+
+source activate biobakery3
+cd /scratch/bfoxman_root/bfoxman/blostein/meta_CAVITIES/Humann2/Files/humann3_output
+
+#make plaque and saliva directories
+
+#join tables
+humann_join_tables -i . -o ECC_genefamilies.tsv --file_name genefamilies
+humann_join_tables -i . -o ECC_pathabund.tsv --file_name pathabundance
+humann_join_tables -i . -o ECC_pathcoverage.tsv --file_name pathcoverage
+
+#renormalize only gene families abundance and path abundance (path coverage does not need to be renormalized; see humann2 tutorial)
+#humann2 output is in RPK (reads per kilobase) which accounts for gene length but not sequencing depth
+#for some applications (strain profiling) RPK is preferable but for most applications want to renorm
+#2 options: relative abundance (relab constrain to 1) or copies per million (cpm constain to 1 mil, copies per million)
+#cpm is 'more convenient' for tables with many features (per tutorial - ?why?)
+humann2_renorm_table
+#special options -m for community (default) vs level wise normalization (levelwise) -p to change rpk suffix
+humann_renorm_table --input ECC_genefamilies.tsv --units cpm --output ECC_genefamiliesCPM.tsv -p 
+humann_renorm_table --input ECC_pathabund.tsv --units cpm --output ECC_pathabundCPM.tsv -p
+humann_split_stratified_table -i ECC_pathabundCPM.tsv -o split_tables
+humann_split_stratified_table -i ECC_genefamiliesCPM.tsv -o split_tables
+#humann_renorm_table --input ECC_genefamilies.tsv --units cpm --output ECC_genefamilies_stratCPM.tsv -p -m levelwise
+#humann_renorm_table --input ECC_pathabund.tsv --units cpm --output ECC_pathabund_stratCPM.tsv -p -m levelwise
