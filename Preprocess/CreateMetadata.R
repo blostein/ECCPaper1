@@ -16,6 +16,9 @@ na_codes <- function(x, ...) {
 USCUR<-read.csv(file.path(meta.data, "USCURPostnatal.csv"))
 Postnatal<-read.csv(file.path(meta.data, "DFTandPostnatal.csv"))
 Prenatal<-read.csv(file.path(meta.data, "Prenatal.csv"))
+additionalMeta<-read.csv(file.path(meta.data, "AdditionalCOHRAMetaData.csv"))
+additionalMeta<-additionalMeta %>%filter(BabysubjectID%in% USCUR$BabySubjectID)
+
 #Incident Visit info
 ControlPrime<-read.csv(file.path(meta.data,"ControlPrime.csv"))
 CasePrime<-read.csv(file.path(meta.data, "CasePrime.csv"))
@@ -105,10 +108,14 @@ Postnatal<-Postnatal %>% select(-Education)
 #How many visits does each person have (limit to up to visit 10, as that is the limit of the saliva samples)? 
 Postnatal<-Postnatal %>% group_by(BabySubjectID) %>% filter(Visit<=10) %>% add_tally() 
 
+#additional meta data
+babyRaceData=additionalMeta%>%mutate(BabySubjectID=BabysubjectID)%>%select(BabySubjectID, BabyRace, BabyEthnicity, FatherRace, FatherEthnicity)%>%unique()%>%mutate(BabyRace=case_when(BabyRace==1~ 'White', 
+                                                                                                                                                                                       BabyRace==6~ 'Bi- or Multi-racial',
+                                                                                                                                                                                       BabyRace==-8888~'Unknown'))
 
 ##############Postnatal and prenatal merge
 #make metadata dataset with prenatal and postnatal information 
-MetaVisit<-left_join(Prenatal, Postnatal)
+MetaVisit<-left_join(left_join(Prenatal, Postnatal), babyRaceData)
 MetaVisit$COHRAID<-paste(MetaVisit$BabySubjectID, '-', MetaVisit$Visit, sep='')
 #how many controls eventually had decay at or before the V10 but were NOT included in this study as cases (hadn't had those visits at the time of ?
 MetaVisit %>% filter(CaseStatus=="Control (post-incident visit)" & Decay=="Decay present (d1ft>0)") %>% select(BabySubjectID, IncidentVisit, Visit, Decay, Prim_d1ft) %>% unique()
