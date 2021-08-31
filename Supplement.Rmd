@@ -3,6 +3,7 @@ title: 'Testing the ecological hypothesis: Longitudinal case-control study of ea
   childhood caries and salivary microbiome assembly supplementary section'
 author: "Freida Blostein"
 date: "`r Sys.Date()`"
+geometry: margin=3cm
 output:
   pdf_document: default
   html_document: default
@@ -64,6 +65,7 @@ library(patchwork)
 library(grid)
 library(gridExtra)
 library(gtable)
+library(kableExtra)
 
 #microbiome
 library(phyloseq)
@@ -71,13 +73,15 @@ library(phangorn)
 library(ape)
 library(msa)
 library(SQMtools)
+library(fgsea)
+library(KEGGREST)
 
 #knitr options
-knitr::opts_chunk$set(echo = FALSE, include=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(echo = FALSE, include=TRUE, warning=FALSE, message=FALSE, results='hide', fig.keep = 'all')
 
 ```
 
-```{r read in data}
+```{r read in data, include=F}
 #read in phyloseq object
 load(file.path(data.out, 'phyloseq', 'phyasv_meta.Rdata'))
 ps_long=microbiome::transform(ps_meta_nodups, 'compositional')%>%psmelt()%>%mutate(ScientificName=paste(Genus, ifelse(is.na(Species), OTU, Species), sep=' '))
@@ -91,7 +95,7 @@ if(keepDouble==T){MV=MetaVisit}
 if(keepDouble==F){MV=MetaVisit%>%filter(count!='Double; drop')}
 ```
 
-```{r load data supervised and unsupervised}
+```{r load data supervised and unsupervised, include=FALSE}
 unsupervised_files<-c(list.files(file.path(data.out, 'Network'), full.names = T), list.files(file.path(data.out, 'CST'), full.names = T)[-1])
 
 unsupervised_files%>%purrr::map(function(file){load(file, envir = .GlobalEnv)})
@@ -115,7 +119,7 @@ load(file.path(data.out, 'MS', 'kegg_and_taxa_slim.Rdata'))
 load(file.path(data.out, 'H3', 'Humann3.Rdata'))
 ```
 
-```{r visit labels}
+```{r visit labels, include=FALSE}
 #visit labels for plotting
 visit_labels2<-c('Birth', '2mos', 'First tooth \n (mean age=9 months)', '12mos', '24mos', '36mos', '48mos', '60mos')
 names(visit_labels2)<-c('2', '3', '4', '5', '7', '8', '9', '10')
@@ -123,43 +127,55 @@ visit_labelsV2=visit_labels2
 names(visit_labelsV2)<-paste0('V', c('3', '5', '7', '8', '9', '10'))
 ```
 
-```{r name CSTs}
+```{r name CSTs, include=FALSE}
 cst_recodes<-data.frame('CST.8'=as.factor(c(1, 2, 3, 4, 5, 6)), CSTlabels=factor(c('Neisseria ASV12 - V. dispar', 'H. parainfluenzae - Neisseria ASV9','Streptococcus ASV1 dominated w/ Gemella ASV2', 'Streptoccous ASV1 dominated w/ G. elegans', 'Gemella ASV2 - H. parainfluenzae - Neisseria ASV9', 'Streptococcus ASV8 - Neisseria ASV12'), levels=c('Streptococcus ASV1 dominated w/ Gemella ASV2', 'Streptoccous ASV1 dominated w/ G. elegans','Gemella ASV2 - H. parainfluenzae - Neisseria ASV9', 'Streptococcus ASV8 - Neisseria ASV12','H. parainfluenzae - Neisseria ASV9', 'Neisseria ASV12 - V. dispar')))
 ```
 
 # Description of study sample
 
-We used a nested case-control design with incident sampling to sample sequential saliva samples from 99 ECC cases and 90 incidence-visit matched controls from the Center for Oral Health Research in Appalachia 2 cohort (COHRA2). Children in COHRA2 are followed from birth until 5 years of age with regularly scheduled study visits in which they both provide oral samples and are examined for dental decay. Children therefore enter the cohort at birth, and all children are at-risk for developing ECC upon entry into the cohort. At each visit in which cases were diagnosed, we selected a similar number of ECC-free controls from the risk-set of all individuals still at risk of ECC, i.e. all those individuals who have not yet been diagnosed with ECC.  Incidence density sampling does not preclude the re-selection of a control as a case at later time points; controls can also be selected as controls more than once. (Supplemental Figure 1, 2). In this analysis, one control became a case at a later age, and one control was selected as a control in two different risk-sets. 
+We used a nested case-control design with incident sampling to sample sequential saliva samples from 99 ECC cases and 90 incidence-visit matched controls from the Center for Oral Health Research in Appalachia 2 cohort (COHRA2). Children in COHRA2 are followed from birth until 5 years of age with regularly scheduled study visits in which they both provide oral samples and are examined for dental decay. Children therefore enter the cohort at birth, and all children are at-risk for developing ECC upon entry into the cohort. At each visit in which cases were diagnosed, we selected a similar number of ECC-free controls from the risk-set of all individuals still at risk of ECC, i.e. all those individuals who have not yet been diagnosed with ECC.  Incidence density sampling does not preclude the re-selection of a control as a case at later time points; controls can also be selected as controls more than once. In this analysis, one control became a case at a later age, and one control was selected as a control in two different risk-sets. 
 
-All available saliva samples from the cases and controls from the visit in which they were selected and all preceding visits were pulled for 16S rRNA amplicon sequencing. Selected individuals occasionally missed visits, did not have a saliva sample available, or had a saliva sample which failed 16S amplicon quality control (Supplemental Table 1). Additionally, we randomly selected a subcohort of 15 cases presenting with enamel lesions at or after the 36-month visit and 15 corresponding controls. Incident-visit plaque and saliva samples from these 30 individuals were submitted for whole genome shotgun metagenomic sequencing.  Additionally, we randomly selected a subcohort of 15 cases presenting with enamel lesions at or after the 36-month visit and 15 corresponding controls. Incident-visit plaque and saliva samples from these 30 individuals were submitted for whole genome shotgun metagenomic sequencing.  
+Cases and controls did not differ in the distribution of sex, site, or race (Additional file 1). 
+
+All available saliva samples from the cases and controls from the visit in which they were selected and all preceding visits were pulled for 16S rRNA amplicon sequencing. Selected individuals occasionally missed visits, did not have a saliva sample available, or had a saliva sample which failed 16S amplicon quality control (Additional file 3). Additionally, we randomly selected a subcohort of 15 cases presenting with enamel lesions at or after the 36-month visit and 15 corresponding controls. Incident-visit plaque and saliva samples from these 30 individuals were submitted for whole genome shotgun metagenomic sequencing.
 
 ```{r TABLE 1}
-source(file.path(code.dir, 'Analysis', 'sampleLoss.R'))
-write.xlsx(lostSamplesTab, file.path(supp.out, 'SupplementalTable1.xlsx'), overwrite=T)
+MV=MV%>%mutate(IncidentVisit.f=factor(MV$IncidentVisit2, labels=visit_labels2[4:8]))
+babyCharacteristics=createTable(compareGroups(Case~.-Case-UniquePersonID, data=MV %>% select(UniquePersonID, BabySex, BabyRace, Site, Case, IncidentVisit.f)%>%unique()))
+export2xls(babyCharacteristics, file.path(supp.out, 'AdditionalFile1.xlsx'), which.table="descr", nmax=TRUE, header.labels=c())
 ```
 
-```{r FIG 2, fig.width=13.2, fig.height=8, include=F}
+
+```{r TABLE 2, include=FALSE}
+source(file.path(code.dir, 'Analysis', 'sampleLoss.R'))
+write.xlsx(lostSamples, file.path(supp.out, 'AdditionalFile3.xlsx'), overwrite=T)
+```
+
+```{r FIG 1, fig.width=13.2, fig.height=8, include=FALSE, eval=F}
 cairo_pdf(file.path(supp.out, 'SupplementalFigure1.pdf'), family='Arial', width=13.2, height=8)
 h1a
 dev.off()
 h1a
 ```
 
+
+
 # 16S amplicon bioinformatics
 
 ## Sequencing
 
-Samples were sequenced over 3 runs (each with 4 plates). Each plate included a positive mock control (ZymoBIOMICS Microbial Community DNA Standard (Zymo Research cat# D6306) and 2 negative controls (extraction control and water control). We processed sequenced reads. Sequencing was done on the Illumina MiSeq platform, using a MiSeq Reagent Kit V2 500 cycles (Illumina cat# MS102-2003), according to the manufacturers instructions with modifications found in the Schloss SOP.  Accuprime High Fidelity Taq (Life Technologies cat # 12346094 ) was used instead of Accuprime Pfx supermix. PCR products are visualized using an E-Gel 96 with SYBR Safe DNA Gel Stain, 2% (Life technologies cat# G7208-02).  Libraries are normalized using SequalPrep Normalization Plate Kit (Life technologies cat # A10510-01) following the manufactures protocol for sequential elution.  The concentration of the pooled samples is determined using Kapa Biosystems Library Quantification kit for Illumina platforms (KapaBiosystems KK4824).  The sizes of the amplicons in the library are determined using the Agilent Bioanalyzer High Sensitivity DNA analysis kit (cat# 5067-4626).  The final library consists of equal molar amounts from each of the plates, normalized to the pooled plate at the lowest concentration. 	Library Preparation for Sequencing and Sequencing Libraries are prepared according to Illumina’s protocol for Preparing Libraries for Sequencing on the MiSeq (part# 15039740 Rev. D) PhiX (15%) was added in 16s amplicon sequencing to create diversity.   Sequencing reagents are prepared according to the Schloss SOP, custom read 1, read 2 and index primers are added to the reagent cartridge.  FASTQ files are generated for paired end reads. DNA was quantified using PicoGreen.																													
+Samples were sequenced over 3 runs (each with 4 plates). Each plate included a positive mock control (ZymoBIOMICS Microbial Community DNA Standard (Zymo Research cat# D6306) and 2 negative controls (extraction control and water control). We processed sequenced reads. Sequencing was done on the Illumina MiSeq platform, using a MiSeq Reagent Kit V2 500 cycles (Illumina cat# MS102-2003), according to the manufacturers instructions with modifications found in the Schloss SOP.  Accuprime High Fidelity Taq (Life Technologies cat # 12346094 ) was used instead of Accuprime Pfx supermix. PCR products are visualized using an E-Gel 96 with SYBR Safe DNA Gel Stain, 2% (Life technologies cat# G7208-02).  Libraries are normalized using SequalPrep Normalization Plate Kit (Life technologies cat # A10510-01) following the manufactures protocol for sequential elution.  The concentration of the pooled samples is determined using Kapa Biosystems Library Quantification kit for Illumina platforms (KapaBiosystems KK4824).  The sizes of the amplicons in the library are determined using the Agilent Bioanalyzer High Sensitivity DNA analysis kit (cat# 5067-4626).  The final library consists of equal molar amounts from each of the plates, normalized to the pooled plate at the lowest concentration. 	Library Preparation for Sequencing and Sequencing Libraries are prepared according to Illumina’s protocol for Preparing Libraries for Sequencing on the MiSeq (part# 15039740 Rev. D) PhiX (15%) was added in 16s amplicon sequencing to create diversity.   Sequencing reagents are prepared according to the Schloss SOP, custom read 1, read 2 and index primers are added to the reagent cartridge.  FASTQ files are generated for paired end reads. DNA was quantified using PicoGreen.						
+
 ## DADA2 processing
 
-```{r dada2 and preprocess info}
+```{r dada2 and preprocess info, include=FALSE}
 track_reads=readRDS(file.path(dada.data, 'track_postchimera_HOMD.rds'))
 readlimit=1000
 load(file.path(output.out, 'Preprocess', paste0('preprocessParamsStats_', readlimit, '.Rdata')))
 load(file.path(output.out, 'Preprocess', paste0('filtersamples_', readlimit, '.Rdata')))
 ```
 
-Reads were processed to amplicon sequence variants (ASVs) using DADA2 (version 1.14.1) [Callahan] and the Human Oral Microbiome Database (HOMD) version 15.2 (Supplementary text) [Escapa 2020]. After examining quality plots for forward and reverse reads, reads were trimmed at the 240th and 200th nucleotide position respectively, or at the first instance of a quality score <= to 11. The following parameters were used for filtering reads: a maximum of 2 expected errors for both forward and reverse reads and no ambiguous bases. 
+Reads were processed to amplicon sequence variants (ASVs) using DADA2 (version 1.14.1) and the Human Oral Microbiome Database (HOMD) version 15.2. After examining quality plots for forward and reverse reads, reads were trimmed at the 240th and 200th nucleotide position respectively, or at the first instance of a quality score <= to 11. The following parameters were used for filtering reads: a maximum of 2 expected errors for both forward and reverse reads and no ambiguous bases. 
 
 Errors were learned (independently for each run) using 1 million bases.  The forward and reverse reads were denoised and then forward and reverse reads were merged together. 
 
@@ -171,19 +187,19 @@ Subsequently, reads were assigned taxonomic names to the species level using the
 
 To identify potential contaminant taxa we used the R package decontam, identifying contaminants using both the frequency-based method (PicoGreen quantification used as measure of concentration of amplified DNA), and the prevalence based method; thresholds set at `r paste(decontam.thresh, collapse=' and ')` respectively. Contaminant identification was performed independently within each batch. Of the original `r taxa_count$all` ASVs, `r taxa_count$all-taxa_count$decontam` ASVs were identified as contaminants and removed.
 
-Next, we filtered out samples that had less than `r readlimit` reads (Supplemental Figure 4; red line at read limit=`r readlimit`). Of a total original `r sample_count$all['True Sample']` samples, `r sample_count$lessthan1000['True Sample']` samples had < `r readlimit`, reads, leaving `r sample_count$morethan1000['True Sample']` samples. Three of the true samples which passed quality control were missing all metadata and were excluded, leaving a total of `r `r sample_count$truesamples['True Sample']` in the analysis. After restricting to just the true samples (not controls) with > `r readlimit`, `r taxa_count$truesamples` ASVs remained. Calculation of diversity metrics (Shannon index, Chao1) was performed on these ASVs. 
+Next, we filtered out samples that had less than `r readlimit` reads (Supplemental Figure 1; red line at read limit=`r readlimit`). Of a total original `r sample_count$all['True Sample']` samples, `r sample_count$lessthan1000['True Sample']` samples had < `r readlimit`, reads, leaving `r sample_count$morethan1000['True Sample']` samples. Three of the true samples which passed quality control were missing all metadata and were excluded, leaving a total of `r sample_count$truesamples['True Sample']` in the analysis. After restricting to just the true samples (not controls) with > `r readlimit`, `r taxa_count$truesamples` ASVs remained. Calculation of diversity metrics (Shannon index, Chao1) was performed on these ASVs. ASVs were not collapsed to the genus or species level. 
 
-```{r FIG 3, include=F}
-cairo_pdf(file.path(supp.out, 'SupplementalFigure3.pdf'), family='Arial', width=13.2, height=8)
+```{r FIG 2, fig.cap='Read count by sample type in true samples and positive and negative controls'}
+cairo_pdf(file.path(supp.out, 'SupplementalFigure1.pdf'), family='Arial', width=13.2, height=8)
 readcountsbyType_preDecontam
 dev.off()
 readcountsbyType_preDecontam
 ```
 
-Of the original `r sample_count$all['Mock']` mock communities, `r sample_count$lessthan1000['Mock']` failed to amplify had less than `r readlimit `reads; the other mock communities in the same run on other plates amplified and were as expected (Supplemental Figure 4). None of the extraction controls had more than `r readlimit` reads, and one water control did, this water control had <3000 reads of highly common taxa in the analytic subset and likely reflects some cross-contamination. 
+Of the original `r sample_count$all['Mock']` mock communities, `r sample_count$lessthan1000['Mock']` had less than `r readlimit `reads; the other mock communities in the same run on other plates amplified and were as expected (Supplemental Figure 2). None of the extraction controls had more than `r readlimit` reads, and one water control did, this water control had <3000 reads of highly common taxa in the analytic subset and likely reflects some cross-contamination. 
 
-```{r FIG 4, include=F}
-cairo_pdf(file.path(supp.out, 'SupplementalFigure4.pdf'), family='Arial', width=13.2, height=8)
+```{r FIG 3, fig.cap="Mock communities by sequencing run as compared to true mock abundance", fig.width=10}
+cairo_pdf(file.path(supp.out, 'SupplementalFigure2.pdf'), family='Arial', width=13.2, height=8)
 ps_mock_bar
 dev.off()
 ps_mock_bar
@@ -196,6 +212,7 @@ Finally, for the unsupervised and supervised analysis, we further restricted the
 # Supervised random forest
 
 ## Additional investigation of *Streptococcus* amplicons identity 
+
 ```{r randomForest}
 imp<-lapply(rfFits_hellinger[c(1, 3)], function(x) as.data.frame(x$finalModel$importance)%>%mutate(ASV=row.names(x$finalModel$importance)))%>%bind_rows(.id="column_label")%>%mutate(Visit=as.integer(gsub('V', '', gsub('All taxa', '', column_label))), Month=ifelse(Visit=='5', '12 month', '24 month'))
 #info on >mean in case | control
@@ -218,9 +235,9 @@ strep_blast=sapply(files, read_csv, simplify=FALSE)%>%bind_rows(.id="id")
 strep_blast=strep_blast%>%mutate(asv=gsub('.*/(asv[0-9]{1,2}).*.csv', '\\1', strep_blast$id))%>%select(asv, everything())%>%select(-id)
 ```
 
-```{r TABLE 2 3 4}
+```{r TABLE 3 4 5}
 write.xlsx(strep_blast %>% split(.$asv),
-           file.path(supp.out, 'SupplementaryTables2-4.xlsx'), overwrite=T)
+           file.path(supp.out, 'AdditionalFile4.xlsx'), overwrite=T)
 ```
 
 ```{r streptococcus correlation plots}
@@ -271,13 +288,13 @@ strep_MS=calculateWGS16Scor(ms_vs_16S, 'Streptococcus', c('ASV1', 'ASV10', "ASV8
 strep_H3=calculateWGS16Scor(saliva_only, 'Streptococcus', c('ASV1', 'ASV10', "ASV8", 'ASV14', 'ASV82', 'ASV26', 'ASV76', 'ASV196'))
 strep_cors=strep_H3/strep_MS+plot_annotation(tag_levels='A')
 #save supplemental plot
-ggsave(strep_cors, file=file.path(supp.out, 'SupplementalFigure_strepcors.eps'), width=8, height=10)
+#ggsave(strep_cors, file=file.path(supp.out, 'SupplementalFigure_strepcors.eps'), width=8, height=10)
 #remove large objects to preserve memory
 rm(saliva_only, ms_species, h3_species)
 ```
 
-```{r FIG 5, fig.width=8, fig.height=10, include=F}
-ggsave(strep_cors, file=file.path(supp.out, 'SupplementalFigure5.eps'), width=8, height=10)
+```{r FIG 4, fig.width=8, fig.height=10, fig.cap='Correlation between Streptococcus amplicons from 16S rRNA gene sequencing and taxa identified from contiguous sequences of whole genome shotgun sequening'}
+ggsave(strep_cors, file=file.path(supp.out, 'SupplementalFigure3.eps'), width=8, height=10)
 strep_cors
 ```
 
@@ -285,7 +302,7 @@ strep_cors
 div=readRDS(file.path(data.out, 'phyloseq', 'diversityandsmut.Rds'))
 ```
 
-```{r TABLE 5}
+```{r TABLE 6}
 network_data=hellinger_network$module.data%>%ungroup()%>%unique()%>%
   select(-module_label3, -module, -CentralTaxa1, -CentralTaxa2,
          -module_label, -TopTaxa1,-TopTaxa2,-moduleColor)%>%
@@ -313,7 +330,7 @@ for(i in 1:length(visits)){
   #export2xls(res, file=file.path(supp.out, paste0('SupplementalTable2_v', visits[i], '.xlsx')))
 }
 names(res_list)=paste0(visit_labels2[names(visit_labels2)%in% visits])
-write.xlsx(res_list, file=file.path(supp.out, 'SupplementalTable5.xlsx'), overwrite=T, rowNames=T)
+write.xlsx(res_list, file=file.path(supp.out, 'AdditionalFile5.xlsx'), overwrite=T, rowNames=T)
 
 ```
 
@@ -326,36 +343,38 @@ asv82_identity=paste(strep_blast %>%filter(asv%in% c('asv82') & `Per. ident`==10
 
 Species-level identification of *Streptococcus* with the V4 amplicon of the 16S gene is not perfect. Two amplicons identified as *Streptococcus* were important features in the taxa-wide random-forest, but did not identify to the species level. The identity of the amplicon identified as *Streptococcus mutans* is central to our test of the ecological hypothesis. We performed several analyses to improve our confidence in the taxonomic classification of these important *Streptococcus* amplicons. 
 
-*Streptococcus ASV82*, which identified as *S. mutans*, had 100% identity with *`r asv82_identity`* in a BLAST search. 6 of the top 10 top hits were *S mutans*. None of the other 4 top 10 hits were human oral *Streptococcus* species (Supplemental Table 2). 
+*Streptococcus ASV82*, which identified as *S. mutans*, had 100% identity with *`r asv82_identity`* in a BLAST search. 6 of the top 10 top hits were *S mutans*. None of the other 4 top 10 hits were human oral *Streptococcus* species (Additional file 4). 
 
-Neither *Streptoccocus ASV8* nor *Streptococcus ASV14* had a high identity with any *S. mutans* 16S sequences when performing a BLAST search. *Streptococcus ASV8* had 100% identity with *`r asv8_identity`*, *Streptococcus ASV14* with *`r asv14_identity`*. Neither *Streptococcus ASV8* or *ASV14* had an *S. mutans* BLAST hit in the top 100 best blast hits (Supplemental Tables 3 & 4). 
+Neither *Streptoccocus ASV8* nor *Streptococcus ASV14* had a high identity with any *S. mutans* 16S sequences when performing a BLAST search. *Streptococcus ASV8* had 100% identity with *`r asv8_identity`*, *Streptococcus ASV14* with *`r asv14_identity`*. Neither *Streptococcus ASV8* or *ASV14* had an *S. mutans* BLAST hit in the top 100 best blast hits (Additional file 4). 
 
-Additionally, we exploited our subcohort with metagenomically sequenced saliva samples to interrogate the identity of the *Streptococcus* amplicons. Abundance of the 16S amplicon *Streptococcus ASV82* (*S. mutans*) was strongly and significantly correlated with abundances of *S. mutans* in WGS samples when using either Humann3 profile abundances or abundances estimated from an assembly based pipeline, while amplicon abundances of *Streptococcus ASV8* correlated strongly and significantly with *S. salivarius* and *Streptococcus ASV14* with *S. australis* and *S. infantis* (Supplemental Figure 5, Pearson r values significant at *P* value<0.05 shown as text in the heatmap). 
+Additionally, we exploited our subcohort with metagenomically sequenced saliva samples to interrogate the identity of the *Streptococcus* amplicons. Abundance of the 16S amplicon *Streptococcus ASV82* (*S. mutans*) was strongly and significantly correlated with abundances of *S. mutans* in WGS samples when using either Humann3 profile abundances or abundances estimated from an assembly based pipeline, while amplicon abundances of *Streptococcus ASV8* correlated strongly and significantly with *S. salivarius* and *Streptococcus ASV14* with *S. australis* and *S. infantis* (Supplemental Figure 3, Pearson r values significant at *P* value<0.05 shown as text in the heatmap). 
+
+The prevalence and abundance of *S. mutans* in case and control samples from visits prior to case diagnosis are shown in Main table 1, while the prevalence and abundance of *S. mutans* in case and control samples from the visit of case diagnosis are in additional file 5. 
 
 # Unsupervised clustering techniques
 
 ## Community state typing: choice of k community state types
 
-Using Dirichlet multinomial community state typing, we identified 6 community state types (also called enterotypes). We chose k=6 community state types as this choice of k produced the best model fit as measured by the LaPlace metric (Supplemental Figure 6). Each sample is assigned to a single community state type based on a posterior probability; any sample which did not assign to a community state type at a posterior probability >80% was labeled unclassified. Community state types were named by the taxa defining their separation. 
+Using Dirichlet multinomial community state typing, we identified 6 community state types (also called enterotypes). We chose k=6 community state types as this choice of k produced the best model fit as measured by the LaPlace metric (Supplemental Figure 4). Each sample is assigned to a single community state type based on a posterior probability; any sample which did not assign to a community state type at a posterior probability >80% was labeled unclassified. Community state types were named by the taxa defining their separation. 
 
-Supplemental Figure 7 shows the relationship between Shannon diversity and community state type. Community state type is significantly associated with Shannon diversity. As children age, the dominant community state types progress from those that are *Streptococcus* dominated to community state types that are higher diversity. The progression of community state types in both cases and controls follows this pattern. Within ages, cases and controls are more likely to belong to different community state types (Figure 2A; Supplemental Figure 7; community state types prevalent in cases in orange shades, community state types prevalent in controls in blue shades).
+Supplemental Figure 5 shows the relationship between Shannon diversity and community state type. Each dot is a single sample which has been assigned to a community state type (x-axis), the Shannon index in that sample is on the y-axis Community state type is significantly associated with Shannon diversity. As children age, the dominant community state types progress from those that are *Streptococcus* dominated to more diverse community state types. The progression of community state types in both cases and controls follows this pattern. 
 
 
-```{r FIG 6, include=F}
+```{r FIG 5, fig.cap='Laplace model fit at k=1:10 community state types'}
 load(file.path(og.data, 'DMM_fit_asvtrim.rda'))
 ### The return value can be queried for measures of fit (Laplace, AIC, BIC); these are plotted for different k
 fit<-fit_asvtrimmed
 lplc <- sapply(fit, laplace)
-plot(lplc, type="b", xlab="Number of Dirichlet Components", ylab="Model Fit", main='Laplace model fit at k=1:10 for community state typing')
-cairo_pdf(file.path(supp.out, 'SupplementalFigure6.pdf'), family='Arial', width=13.2, height=8)
+plot(lplc, type="b", xlab="Number of Dirichlet Components", ylab="Model Fit")
+cairo_pdf(file.path(supp.out, 'SupplementalFigure5.pdf'), family='Arial', width=13.2, height=8)
 plot(lplc, type="b", xlab="Number of Dirichlet Components", ylab="Model Fit", main='Laplace model fit at k=1:10 for community state typing')
 dev.off()
 ```
 
-```{r FIG 7, include=F}
+```{r FIG 6, fig.cap='Shannon index in samples by visit and community state type', fig.width=13}
 fig7=table1%>%ggplot(aes(x=CSTlabels, y=Shannon, color=CSTlabels))+geom_boxplot()+geom_jitter(alpha=0.2)+facet_wrap(~Visit,nrow=1, labeller=labeller(Visit=visit_labels2))+stat_compare_means(label='..p.signif..')+scale_color_manual(name="Community state type", values=c("thistle", "lightcoral", "deepskyblue",   "darkorange", "royalblue2",  "darkorange3",  "royalblue4", "darkorange4", 'grey', 'black'), guide=guide_legend(nrow=2))+theme_classic()+theme(axis.text.x = element_blank())+theme(legend.text=element_text(face='italic'))+theme(legend.position='bottom')+xlab('')#+stat_compare_means(label='p.signif', label.y=4, comparisons=list(c("Gemella ASV2 - H. parainfluenzae - Neisseria ASV9", "Streptococcus ASV8 - Neisseria ASV12"), c("H. parainfluenzae - Neisseria ASV9", "Neisseria ASV12 - V. dispar")))
 fig7
-cairo_pdf(file.path(supp.out, 'SupplementalFigure7.pdf'), family='Arial', width=13.2, height=8)
+cairo_pdf(file.path(supp.out, 'SupplementalFigure6.pdf'), family='Arial', width=13.2, height=8)
 fig7
 dev.off()
 ```
@@ -390,29 +409,33 @@ network_overtime_others=ggplot(hellinger_network$module.data%>%filter(Visit %in%
     theme(legend.position='bottom')+theme(strip.text = element_text(face='italic'))
 ```
 
-```{r FIG 8, include=F}
+```{r FIG 7, fig.cap='Summed network module relative abundance for the network modules in the COHRA2 cohort not shown in Figure 2 of main paper', fig.width=10, fig.height=8}
 network_overtime_others
-ggsave(filename=file.path(supp.out, 'SupplementalFigure8.eps'), network_overtime_others, units=c('in'), width=10, height=10, device=cairo_ps)
+ggsave(filename=file.path(supp.out, 'SupplementalFigure7.eps'), network_overtime_others, units=c('in'), width=10, height=10, device=cairo_ps)
 ```
 
-```{r FIG 9, include=F}
-entire_network<-gg_whole%>%ggraph('nicely')+geom_edge_link(aes(width=ifelse(weight>0.1, weight, NA)), alpha=1, color='grey')+geom_node_point(aes(color=factor(module_label3), size=m, shape=factor(as)))+geom_node_text(aes(label=ScientificNameDisplay), fontface='italic', family='Times', repel=TRUE, size=3)+guides(size=FALSE, edge_color=FALSE, color=guide_legend(nrow=2,byrow=TRUE), edge_width=FALSE)+scale_shape_manual('', values=c('triangle', 'square'))+scale_color_discrete(name='')+theme_graph(base_family='serif')+theme(legend.position = 'bottom')+scale_edge_width(range = c(1, 8))+scale_size(range=c(2, 8))+theme(strip.text.x = element_blank())+theme(text=element_text(family='serif', face='italic'))
+```{r FIG 8,  fig.cap='Structure of the entire network of ASVs, before separation into network modules', fig.width=8.5, fig.height=11}
+entire_network<-gg_whole%>%ggraph('nicely')+geom_edge_link(aes(width=ifelse(weight>0.1, weight, NA)), alpha=1, color='grey')+geom_node_point(aes(color=factor(module_label3), size=m, shape=factor(as)))+geom_node_text(aes(label=ScientificNameDisplay), fontface='italic', family='Times', repel=TRUE, size=3)+guides(size=FALSE, edge_color=FALSE, color=guide_legend(nrow=3,byrow=TRUE), edge_width=FALSE)+scale_shape_manual('', values=c('triangle', 'square'))+scale_color_discrete(name='')+theme_graph(base_family='serif')+theme(legend.position = 'bottom')+scale_edge_width(range = c(1, 8))+scale_size(range=c(2, 8))+theme(strip.text.x = element_blank())+theme(text=element_text(family='serif', face='italic'))
 
 entire_network
 
-ggsave(filename=file.path(supp.out, 'SupplementalFigure9.eps'), entire_network, units=c('in'), width=10, height=10, device=cairo_ps)
+ggsave(filename=file.path(supp.out, 'SupplementalFigure8.eps'), entire_network, units=c('in'), width=10, height=10, device=cairo_ps)
 ```
 
-```{r TABLE6}
+```{r TABLE 7}
 rm(entire_network)
 module_membership<-left_join(hellinger_network$intraStats, hellinger_network$networkNames)%>%select(ASV, ScientificName, module_label2, module_label3,, module, kTotal, kWithin, kOut, kDiff)%>%group_by(module)%>%split(f=as.factor(.$module))
-write.xlsx(module_membership, file=file.path(supp.out, 'SupplementalTable6.xlsx'), overwrite = T)
+write.xlsx(module_membership, file=file.path(supp.out, 'AdditionalFile6.xlsx'), overwrite = T)
 ```
 
 
-Using weighted co-occurrence network analysis, we identified 5 network modules of co-occurring ASVs. These networks were named after the top two most abundant taxa in the network, and the most central taxa in the network. To summarize these network modules, we summed the relative abundances of each taxa belonging to the network module compared the trajectories of these abundances over time between cases and controls. Change in the summed relative abundance of the 3 network modules not displayed in Figure 2B are shown in Supplemental Figure 8; the structure of the overall network is shown in Supplemental Figure 9. 
+Using weighted co-occurrence network analysis, we identified 5 network modules of co-occurring ASVs. These networks were named after the top two most abundant taxa in the network, and the most central taxa in the network. The membership of all of the networks is in Additional file 6. To summarize these network modules, we summed the relative abundances of each taxa belonging to the network module compared the trajectories of these abundances over time between cases and controls. Change in the summed relative abundance of the 3 network modules not displayed in Figure 2B are shown in Supplemental Figure 6; the structure of the overall network is shown in Supplemental Figure 7. In Supplemental Figure 7, ASVs are nodes in the network. ASVs are colored by the module to which they were assigned and sized according to their abundance. The shape of the ASV node indicates if that ASV is more abundant in ECC cases (triangles) or controls (squares). Edges with a weight<0.1 have been eliminated from the network visualization for readability, otherwise edge width corresponds to the strength of the correlation between nodes. ASVs of special interest are labeled.  
+
+Cases and controls differed in the summed relative abundance of these network modules and the distribution of community state types in both pre-incident (Table 1) and incident (Additional file 5) visits
 
 ## Overlap between top ten separation taxa from community state typing and top two most abundant taxa from each network modules
+
+Supplemental Figure 8 shows the overlap between the top two most abundant ASVs in each of the five network modules (ten ASVs) and the top ten most important ASVs for the separation of the community state types. There is significant overlap in these ASVs, with nine of the ten ASVs being the same. 
 
 ```{r unsupervised guilds vendiagram}
 tax_contribution<-left_join(read.csv(file.path(output.out, 'CST', 'k6', 'k_6taxcontribution.csv'), col.names = c('ASV', 'Mean', paste0('CST', seq(1, 6)), 'diff', 'cdiff')), taxa)
@@ -435,18 +458,18 @@ width_line<-1
 #ggvenn(list('Top 10 CST \n separation taxa'=top_seps, 'Top 2 most abundant \n taxa from each WCN'=top_nets, 'Top 2 most central \n taxa from each WCN'=top_hubs))
 #but for this paper, specifically, think the comparison between 
 #top most abundant network hubs and top separation taxa is more important 
-venn_comp=ggvenn(list('Top 10 CST \n separation taxa'=top_seps, 'Top 2 most abundant \n taxa from each WCN'=top_nets), show_elements = T, text_size=2, label_sep='\n')
+venn_comp=ggvenn(list('CST \n separation taxa'=top_seps, 'Abundant \n network taxa'=top_nets), show_elements = T, text_size=1.4, label_sep='\n')
 ```
 
-```{r FIG 10, include=F}
+```{r FIG 9, fig.cap='Venn diagram of top two ASVs in each of five network modules (10 ASVs) vs the top ten ASVs contributing to the separation of the community state types', fig.width=13}
 venn_comp
 
-ggsave(filename=file.path(supp.out, 'SupplementalFigure10.eps'), venn_comp, units=c('in'), width=8, height=8)
+ggsave(filename=file.path(supp.out, 'SupplementalFigure9.eps'), venn_comp, units=c('in'), width=8, height=8)
 ```
 
 ## Robustness analysis
 
-For the Dirichlet multinomial community state typing, we varied the choice of k community state types. When decreasing k to 5, the case-associated 12-month community state type was combined with one of the 2-month community state types (Supplemental Figure 11). When decreasing k to 4, the control-associated community state type was also collapsed. However, case- and control-associated community state types apparent at and after the 24-month visit were still apparent. The clustering of the samples through community state types was overall fairly robust, according to the rand index, the adjusted rand index and the adjusted mutual information index (Supplemental table 7).
+For the Dirichlet multinomial community state typing, we varied the choice of k community state types. When decreasing k to 5, the case-associated 12-month community state type was combined with one of the 2-month community state types (Supplemental Figure 9). When decreasing k to 4, the control-associated community state type was also collapsed. However, case- and control-associated community state types apparent at and after the 24-month visit were still apparent. The clustering of the samples through community state types was overall fairly robust, according to the rand index, the adjusted rand index and the adjusted mutual information index (Additional file 7).
 
 
 ```{r cst robust}
@@ -480,12 +503,12 @@ cst_sens<-ggplot(CST_compare_al%>%filter(Visit %in% c(3, 5, 7, 8)),
     scale_fill_manual(name="", values=c("thistle", "lightcoral", "darkorange", "deepskyblue", "darkorange3","royalblue2", 'thistle', 'lightcoral', 'deepskyblue', 'darkorange3', 'royalblue2', 'thistle', 'lightcoral', 'darkorange3', 'royalblue2', 'grey'), labels=c(paste(rep('k=6: CST', 6), seq(1, 6)), paste(rep('k=5: CST', 5), seq(1, 5)), paste(rep('k=4: CST', 4), seq(1, 4)), 'Unassigned at P>0.8'))+scale_y_continuous('Number of samples assigned to CSTs')+scale_x_discrete(name='', labels=c('6 CSTs', '5 CSTs', '4 CSTs'))
 ```
 
-```{r FIG 11, include=F}
+```{r FIG 10, fig.cap='Sensitivity of the community state types in the COHRA2 cohort to the choice of k', fig.width=10}
 cst_sens
-ggsave(filename=file.path(supp.out, 'SupplementalFigure11.eps'), cst_sens, units=c('in'), width=8, height=8)
+ggsave(filename=file.path(supp.out, 'SupplementalFigure10.eps'), cst_sens, units=c('in'), width=8, height=8)
 ```
 
-For the weighted co-occurrence network clusters, we varied the choice of normalization transform, comparing the Hellinger transform to the center-log ratio transform. When using the center-log ratio transform instead of the Hellinger transform, six network modules were identified instead of five. The network module with the most member taxa was split in two (Supplemental Figure 12), and some rearrangement of taxa membership existed between the other network modules, thus, clustering of the taxa across different choices of transform were better than random but not high. However, the ECC case status associated clusters (control enriched *Neisseria* ASV9-*H. parainfluenzae* network; case-enriched *Veillonella* ASV5-*Streptococcus* ASV8 network) were more stable and relatively robust (Supplemental Figure 12; Supplemental Table 7).
+For the weighted co-occurrence network clusters, we varied the choice of normalization transform, comparing the Hellinger transform to the center-log ratio transform. When using the center-log ratio transform instead of the Hellinger transform, six network modules were identified instead of five. The network module with the most member taxa was split in two (Supplemental Figure 10), and some rearrangement of taxa membership existed between the other network modules, thus, clustering of the taxa across different choices of transform were better than random but not high. However, the ECC case status associated clusters (control enriched *Neisseria* ASV9-*H. parainfluenzae* network; case-enriched *Veillonella* ASV5-*Streptococcus* ASV8 network) were more stable and relatively robust (Supplemental Figure 10; Additional file 7).
 
 ```{r network robustness}
 #a dataframe of the taxa in each network cluster across the two different transformations
@@ -535,11 +558,12 @@ hellinger_yellowbrowngreen<-ggplot(hellinger_network$module.data%>%filter(Visit 
 network_sens2<-plot_grid(hellinger_yellowbrowngreen+stat_compare_means(label='p.signif', hide.ns=T)+ggtitle('Hellinger networks'), clr_greenyellowbrown+stat_compare_means(label='p.signif', hide.ns=T)+ggtitle('CLR networks'))
 ```
 
-```{r FIG 12, include=F}
+```{r FIG 11, fig.cap='Sensitivity of the network modules in the COHRA2 cohort to the choice of Hellinger vs center-log ratio transform', fig.width=16, fig.height=8}
 network_sensall<-plot_grid(network_sensitivity, network_sens2, labels=c('A', 'B'))
-cairo_pdf(file.path(supp.out, 'robust_network.pdf'), family='Arial', width=20, height=8)
+cairo_pdf(file.path(supp.out, 'SupplementalFigure11.pdf'), family='Arial', width=20, height=8)
 network_sensall
 dev.off()
+network_sensall
 ```
 
 ```{r ami ari ri}
@@ -556,13 +580,13 @@ comparedf=rbind(comparedf, clr_hellinger_cohra, clr_hellinger_cohra_trim)
 compare_cluster_table=comparedf%>%select(cohort, comparison, RI, ARI, AMI)
 ```
 
-```{r TABLE 7}
-write.xlsx(compare_cluster_table, file=file.path(supp.out, 'SupplementalTable7.xlsx'), overwrite = T)
+```{r TABLE 8}
+write.xlsx(compare_cluster_table, file=file.path(supp.out, 'AdditionalFile7.xlsx'), overwrite = T)
 ```
 
 ## Replication analysis 
 
-Supplemental figure 13 shows the network modules from the Holgerson et al. cohort which were similar in composition to the ECC-associated networks in the COHRA2 cohort. Figure 14 shows other network modules from the Holgerson et al. cohort. 
+Supplemental figure 11 shows the network modules from the Holgerson et al. cohort which were similar in composition to the ECC-associated networks in the COHRA2 cohort. Figure 12 shows other network modules from the Holgerson et al. cohort.
 
 ```{r network and cst replicability}
 prj_files<-c(list.files(file.path(data.out, 'PRJ', 'Network'), full.names = T), list.files(file.path(data.out, 'PRJ', 'CST'), full.names = T)[-4])
@@ -609,16 +633,16 @@ bVSb=shared_taxa %>%filter(cohra=='brown'& prj=='brown')
 yVSt=shared_taxa %>%filter(cohra=='yellow'& prj=='turquoise')
 ```
 
-```{r FIG 13, include=F}
+```{r FIG 12, fig.cap='Network modules from the Holgerson et al. cohort that are similar in composition and strucutre to those observed in the COHRA2 cohort', fig.width=8, fig.height=11}
 matching_networks
-cairo_pdf(file.path(supp.out, 'SupplementalFigure13.pdf'), family='Arial', width=18, height=10)
+cairo_pdf(file.path(supp.out, 'SupplementalFigure12.pdf'), family='Arial', width=18, height=10)
 matching_networks
 dev.off()
 ```
 
-```{r FIG 14, include=F}
+```{r FIG 13, fig.cap='Other network modules identified in the Holgerson et al. cohort',fig.width=8, fig.height=11}
 other_networks
-cairo_pdf(file.path(supp.out, 'SupplementalFigure14.pdf'), family='Arial', width=18, height=10)
+cairo_pdf(file.path(supp.out, 'SupplementalFigure13.pdf'), family='Arial', width=18, height=10)
 other_networks
 dev.off()
 ```
@@ -631,7 +655,7 @@ named_asvs_nona=named_asvs%>%filter(!is.na(modulePRJ) & !is.na(moduleCohra))
 named_asvs_trim=named_asvs%>%filter(modulePRJ %in%c('blue_prj', 'brown_prj', 'turquoise_prj') & moduleCohra %in% c('', ''))
 ```
 
- To compare the relatedness of the amplicon sequence variants assigned to various network modules across the COHRA and Holgerson cohort, we performed multiple sequence alignment of the amplicons using the R packages msa, using the ClustalW algorithim. We computed pairwise distances from the DNA sequences using the r function dist.dml from the r package phangorn, using the JC69 model. We created a neighbor joining tree using the phangorn function NJ, then fit a generalized time-reversible with gamma rate maximum likelihood tree using the neighbor joining tree as a starting point. We obtained 100 bootstrap values for the tree using bootstrap.pml and plotted the tree using ggtree and collapsed branches present in <50 of the bootstrapped trees. Supplemental Figure 15 and 16 show bootstrapped phylogenetic trees for amplicons belonging to the *Neisseria* and *Veillonella* generas (respectively) from the Holgerson *et al.* and COHRA2 cohorts.
+ To compare the relatedness of the amplicon sequence variants assigned to various network modules across the COHRA and Holgerson cohort, we performed multiple sequence alignment of the amplicons using the R packages msa, using the ClustalW algorithim. We computed pairwise distances from the DNA sequences using the r function dist.dml from the r package phangorn, using the JC69 model. We created a neighbor joining tree using the phangorn function NJ, then fit a generalized time-reversible with gamma rate maximum likelihood tree using the neighbor joining tree as a starting point. We obtained 100 bootstrap values for the tree using bootstrap.pml and plotted the tree using ggtree and collapsed branches present in <50 of the bootstrapped trees. Supplemental Figure 13 shows bootstrapped phylogenetic trees for amplicons belonging to the A) *Neisseria* and B) *Veillonella* generas (respectively) from the Holgerson *et al.* and COHRA2 cohorts.
 
 ```{r network trees create data}
 ps.f<-ps_meta_nodups
@@ -716,19 +740,19 @@ tree_figure=plot_grid(neis_tree_collapsed, veil_tree_collapsed, ncol=1, labels=c
 save(tree_figure, file=file.path(og.data, 'treefigure.Rdata'))
 ```
 
-```{r FIG 15, include=F}
+```{r FIG 14, fig.cap='Phylogenetic trees showing relationships between A) Neisseria amplicons and B) Veillonella amplicons in the COHRA2 and Holgerson et al. cohorts', fig.width=12, fig.height=8}
 load(file=file.path(og.data, 'treefigure.Rdata'))
 tree_figure
 ```
 
-```{r FIG 15 save}
-ggsave(tree_figure, file=file.path(supp.out, 'SupplementalFigure15.pdf'), height=12, width=25)
+```{r FIG 14 save}
+ggsave(tree_figure, file=file.path(supp.out, 'SupplementalFigure14.pdf'), height=12, width=25)
 ```
 
 
-#ECC-associated guilds associate with concurrent salivary pH and future *S. mutans* prevalence 
+# ECC-associated guilds associate with concurrent salivary pH and future *S. mutans* prevalence 
 
-Salivary pH alone did not distinguish cases and controls at the 12-month and 24-month visits (Supplemental Figure 16A). However, the *H. parainfluenzae-Neisseria* ASV9 network module was positively correlated with salivary pH at the 12- and 24-month visits (Supplemental Figure 16B) and a similar trend existed between salivary pH and the community state types (Supplemental Figure 16D). 
+Salivary pH alone did not distinguish cases and controls at the 12-month and 24-month visits (Supplemental Figure 14A). However, the *H. parainfluenzae-Neisseria* ASV9 network module was positively correlated with salivary pH at the 12- and 24-month visits (Supplemental Figure 14B) and a similar trend existed between salivary pH and the community state types (Supplemental Figure 14D). 
 
 ```{r salivary pH future smutans}
 #create cst group variable for plotting
@@ -745,9 +769,9 @@ netcst.57=netcst%>%filter(Visit %in% c(5, 7))%>%mutate(SalivapH=ifelse(SalivapH<
 
 #salivary pH, concurrent
 #module -> ph
-net_ph<-ggplot(netcst.57, aes(x=SalivapH, y=modAbund))+geom_point()+facet_grid(Visit~module_label3, labeller=labeller(Visit=visit_labels2))+geom_smooth(color='red', method='lm')+theme_classic()+stat_cor()+ggtitle('Salivary pH & WCN module abundance')+theme(strip.text.x = element_text(face='italic'))+xlab('Salivary pH')+ylab('Summed module relative abundance')+theme(text=element_text(size=14))
+net_ph<-ggplot(netcst.57, aes(x=SalivapH, y=modAbund))+geom_point()+facet_grid(Visit~module_label3, labeller=labeller(Visit=visit_labels2))+geom_smooth(color='red', method='lm')+theme_classic()+stat_cor()+ggtitle('Salivary pH & network module abundance')+theme(strip.text.x = element_text(face='italic'))+xlab('Salivary pH')+ylab('Summed module relative abundance')+theme(text=element_text(size=14))
 
-cstph=ggplot(netcst.57%>%filter(moduleColor=='brown' & !is.na(CSTlabels)), aes(x=CSTlabels, y=SalivapH, color=CSTlabels))+geom_boxplot()+geom_jitter(alpha=0.5)+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+stat_compare_means(label.y=8.5)+theme_classic()+theme(axis.text.x = element_blank(), axis.title.x = element_blank())+theme(legend.position = 'bottom', legend.text = element_text(face='italic'))+scale_color_manual(name="", values=c("thistle","lightcoral", "deepskyblue",  "darkorange", "royalblue2", "darkorange3",  "royalblue4", "darkorange4", 'grey'), guide=guide_legend(nrow=2))+theme(legend.position = 'bottom')+stat_compare_means(label.y=8.5, label='p.format', comparisons=list(c("Gemella ASV2 - H. parainfluenzae - Neisseria ASV9", "Streptococcus ASV8 - Neisseria ASV12"), c("H. parainfluenzae - Neisseria ASV9", "Neisseria ASV12 - V. dispar"), c("Streptococcus ASV1 dominated w/ Gemella ASV2", "Streptoccous ASV1 dominated w/ G. elegans" )))+ggtitle('Salivary pH & CST')+theme(text=element_text(size=14))
+cstph=ggplot(netcst.57%>%filter(moduleColor=='brown' & !is.na(CSTlabels)), aes(x=CSTlabels, y=SalivapH, color=CSTlabels))+geom_boxplot()+geom_jitter(alpha=0.5)+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+stat_compare_means(label.y=8.5)+theme_classic()+theme(axis.text.x = element_blank(), axis.title.x = element_blank())+theme(legend.position = 'bottom', legend.text = element_text(face='italic'))+scale_color_manual(name="", values=c("thistle","lightcoral", "deepskyblue",  "darkorange", "royalblue2", "darkorange3",  "royalblue4", "darkorange4", 'grey'), guide=guide_legend(nrow=2))+theme(legend.position = 'bottom')+stat_compare_means(label.y=8.5, label='p.format', comparisons=list(c("Gemella ASV2 - H. parainfluenzae - Neisseria ASV9", "Streptococcus ASV8 - Neisseria ASV12"), c("H. parainfluenzae - Neisseria ASV9", "Neisseria ASV12 - V. dispar"), c("Streptococcus ASV1 dominated w/ Gemella ASV2", "Streptoccous ASV1 dominated w/ G. elegans" )))+ggtitle('Salivary pH & community state types')+theme(text=element_text(size=14))
 
 #lagged data for s mutans 
 netcst.lag<-netcst %>%group_by(BabySubjectID, moduleColor)%>%arrange(BabySubjectID, AgeAtExamMonths, moduleColor)%>%mutate(modAbund.lag=lag(modAbund, n=1, default=NA, order_by=BabySubjectID), SalivapH.lag=lag(SalivapH, n=1, default=NA, order_by=BabySubjectID), smut.lag=lag(smutPrevalence, n=1, default=NA, order_by = BabySubjectID), CST.lag=lag(CSTlabels, n=1, default=NA, order_by=BabySubjectID), 
@@ -760,8 +784,9 @@ case_ph<-ggplot(MV %>% filter(Visit %in% c(5, 7)), aes(x=Case, y=SalivapH))+geom
 ph_smut<-plot_grid(plot_grid(case_ph, net_ph, ncol=2, rel_widths=c(0.2, 0.8), labels=c('A', 'B')), plot_grid(smut_lag, cstph, ncol=2, rel_widths=c(0.35, 0.65), labels=c('C', 'D')), ncol=1)
 ```
 
-```{r FIG 16, include=F}
-ggsave(ph_smut, file=file.path(supp.out, 'SupplementalFigure16.pdf'), height=12, width=25)
+```{r FIG 15, fig.cap='Relationships between unsupervised clusters, salivary pH and future S. mutans detection', fig.height=12, fig.width=25}
+ph_smut
+ggsave(ph_smut, file=file.path(supp.out, 'SupplementalFigure15.pdf'), height=12, width=25)
 ```
 
 ```{r pull values}
@@ -789,26 +814,26 @@ pullRho<-function(name, var, time){
 smut_lag_cst<-netcst.lag %>% filter(moduleColor=='brown')%>%group_by(Visit, CST.lag)%>%mutate(n_total=n())%>%group_by(Visit, CST.lag, smutPrevalence)%>%mutate(n=n())%>%mutate(percent=round((n/n_total)*100, 1))%>%select(n, n_total, percent)%>%unique()
 ```
 
-The groups of co-occurring taxa identified from the unsupervised clustering methods associated with concurrent salivary pH at the 12- and 24-month visits. Increasing abundance of the *H. parainfluenzae & Neisseria ASV9* module was correlated with increasing salivary pH (`r pullRho('Haemo', 'Saliva_pH', 5)`, `r pullRho('Haemo', 'Saliva_pH', 7)` respectively). A similar trend was apparent when comparing mean salivary pH between samples assigned to the different community state types (Supplemental Figure 16). 
+The groups of co-occurring taxa identified from the unsupervised clustering methods associated with concurrent salivary pH at the 12- and 24-month visits. Increasing abundance of the *H. parainfluenzae & Neisseria ASV9* module was correlated with increasing salivary pH (`r pullRho('Haemo', 'Saliva_pH', 5)`, `r pullRho('Haemo', 'Saliva_pH', 7)` respectively). A similar trend was apparent when comparing mean salivary pH between samples assigned to the different community state types (Supplemental Figure 14). 
 
-Children who went on to have *S. mutans* amplicon detected in their saliva at the next visit had lower abundances of the *H. parainfluenzae & Neisseria ASV9* network and higher abundances of the *Veillonella ASV5 & Streptococcus ASV8 network* network than children who did not go on to have *S. mutans detected* (Supplementary Figure 16). A similar trend existed for community state types. Of the children assigned to the *Gemella ASV2 - H. parainfluenzae - Neisseria ASV9* at the 12-month visit, `r smut_lag_cst %>% filter(Visit==7 & CST.lag=='Gemella ASV2 - H. parainfluenzae - Neisseria ASV9' & smutPrevalence=='Yes')%>%pull(percent)`% of children had detectable *S. mutans* amplicon at the 24-month visit, as compared to `r smut_lag_cst %>% filter(Visit==7 & CST.lag=='Streptococcus ASV8 - Neisseria ASV12' & smutPrevalence=='Yes')%>%pull(percent)`% of the children assigned to the children assigned to the *Streptococcus ASV8 - Neisseria ASV12* CST. Of the children assigned to the *H. parainfluenzae - Neisseria ASV9* CST at the 24-month visit, `r smut_lag_cst %>% filter(Visit==8 & CST.lag=='H. parainfluenzae - Neisseria ASV9' & smutPrevalence=='Yes')%>%pull(percent)`% of children had detectable *S. mutans* amplicon at the 36-month visit, as compared to `r smut_lag_cst %>% filter(Visit==8 & CST.lag=='Neisseria ASV12 - V. dispar' & smutPrevalence=='Yes')%>%pull(percent)`% of children assigned to the *Neisseria ASV12 - Veillonella ASV5*.
+Children who went on to have *S. mutans* amplicon detected in their saliva at the next visit had lower abundances of the *H. parainfluenzae & Neisseria ASV9* network and higher abundances of the *Veillonella ASV5 & Streptococcus ASV8 network* network than children who did not go on to have *S. mutans detected* (Supplementary Figure 14C). A similar trend existed for community state types. Of the children assigned to the *Gemella ASV2 - H. parainfluenzae - Neisseria ASV9* at the 12-month visit, `r smut_lag_cst %>% filter(Visit==7 & CST.lag=='Gemella ASV2 - H. parainfluenzae - Neisseria ASV9' & smutPrevalence=='Yes')%>%pull(percent)`% of children had detectable *S. mutans* amplicon at the 24-month visit, as compared to `r smut_lag_cst %>% filter(Visit==7 & CST.lag=='Streptococcus ASV8 - Neisseria ASV12' & smutPrevalence=='Yes')%>%pull(percent)`% of the children assigned to the children assigned to the *Streptococcus ASV8 - Neisseria ASV12* CST. Of the children assigned to the *H. parainfluenzae - Neisseria ASV9* CST at the 24-month visit, `r smut_lag_cst %>% filter(Visit==8 & CST.lag=='H. parainfluenzae - Neisseria ASV9' & smutPrevalence=='Yes')%>%pull(percent)`% of children had detectable *S. mutans* amplicon at the 36-month visit, as compared to `r smut_lag_cst %>% filter(Visit==8 & CST.lag=='Neisseria ASV12 - V. dispar' & smutPrevalence=='Yes')%>%pull(percent)`% of children assigned to the *Neisseria ASV12 - Veillonella ASV5*.
 
 
-The *H. parainfluenzae & Neisseria ASV9* module did not correlate with the total number of primary teeth present at the 12- or 24-month visits, although the *Streptococcus ASV1 and Neisseria ASV12 module* did (Supplemental Figure 17). Similarly, although the mean number of primary teeth increased between community state types which were dominate at different times, the number of primary teeth did not significantly differ between the community state types that were codominant at any one time (Supplemental Figure 17). Among the subset of children recruited from Pennsylvania, data on the approximate age at first tooth emergence was available. In this subset, age at first tooth emergence was not associated with either WCN modules or CSTs.
+The *H. parainfluenzae & Neisseria ASV9* module did not correlate with the total number of primary teeth present at the 12- or 24-month visits, although the *Streptococcus ASV1 and Neisseria ASV12 module* did (Supplemental Figure 15). Similarly, although the mean number of primary teeth increased between community state types which were dominate at different times, the number of primary teeth did not significantly differ between the community state types that were codominant at any one time (Supplemental Figure 15). Among the subset of children recruited from Pennsylvania, data on the approximate age at first tooth emergence was available. In this subset, age at first tooth emergence was not associated with either WCN modules or CSTs.
 
 ```{r tooth number tooth emergence}
 #cst to primary tooth count
-cst_prim<-ggplot(netcst.57%>%filter(moduleColor=='brown' &!is.na(CSTlabels)), aes(x=CSTlabels, y=Prim_Tot_Teeth_Present, color=CSTlabels))+geom_boxplot()+geom_jitter()+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+stat_compare_means(label.y=25)+theme_classic()+theme(axis.text.x = element_blank(), axis.title.x = element_blank())+theme(legend.position = 'bottom', legend.text = element_text(face='italic'))+scale_color_manual(name="Community state type", values=c("thistle","lightcoral", "deepskyblue",  "darkorange", "royalblue2", "darkorange3",  "royalblue4", "darkorange4", 'grey'), guide=guide_legend(nrow=2))+stat_compare_means(label.y=22, label='p.signif', comparisons=list(c("Gemella ASV2 - H. parainfluenzae - Neisseria ASV9", "Streptococcus ASV8 - Neisseria ASV12"), c("H. parainfluenzae - Neisseria ASV9", "Neisseria ASV12 - V. dispar"), c("Streptococcus ASV1 dominated w/ Gemella ASV2", "Streptoccous ASV1 dominated w/ G. elegans" )))+ggtitle('Primary teeth present & CST')+ylab('Primary teeth present (count)')+theme(text=element_text(size=14))
+cst_prim<-ggplot(netcst.57%>%filter(moduleColor=='brown' &!is.na(CSTlabels)), aes(x=CSTlabels, y=Prim_Tot_Teeth_Present, color=CSTlabels))+geom_boxplot()+geom_jitter()+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+stat_compare_means(label.y=25)+theme_classic()+theme(axis.text.x = element_blank(), axis.title.x = element_blank())+theme(legend.position = 'bottom', legend.text = element_text(face='italic'))+scale_color_manual(name="Community state type", values=c("thistle","lightcoral", "deepskyblue",  "darkorange", "royalblue2", "darkorange3",  "royalblue4", "darkorange4", 'grey'), guide=guide_legend(nrow=2))+stat_compare_means(label.y=22, label='p.signif', comparisons=list(c("Gemella ASV2 - H. parainfluenzae - Neisseria ASV9", "Streptococcus ASV8 - Neisseria ASV12"), c("H. parainfluenzae - Neisseria ASV9", "Neisseria ASV12 - V. dispar"), c("Streptococcus ASV1 dominated w/ Gemella ASV2", "Streptoccous ASV1 dominated w/ G. elegans" )))+ggtitle('Primary teeth present & community state type')+ylab('Primary teeth present (count)')+theme(text=element_text(size=14))
 #module -> teeth present
-net_teeth<-ggplot(netcst.57, aes(x=Prim_Tot_Teeth_Present, y=modAbund))+geom_point()+facet_grid(Visit~module_label3, labeller = labeller(Visit=visit_labels2))+geom_smooth(color='red', method='lm')+theme_classic()+stat_cor()+ggtitle('Primary teeth present & WCN module abundance')+theme(strip.text.x = element_text(face='italic'))+xlab('# primary teeth')+ylab('Summed module relative abundance')+theme(text=element_text(size=14))
+net_teeth<-ggplot(netcst.57, aes(x=Prim_Tot_Teeth_Present, y=modAbund))+geom_point()+facet_grid(Visit~module_label3, labeller = labeller(Visit=visit_labels2))+geom_smooth(color='red', method='lm')+theme_classic()+stat_cor()+ggtitle('Primary teeth present & network module abundance')+theme(strip.text.x = element_text(face='italic'))+xlab('# primary teeth')+ylab('Summed module relative abundance')+theme(text=element_text(size=14))
 #case to teeth
 case_teeth<-ggplot(MV%>%filter(Visit %in% c(5, 7)), aes(x=Case, y=Prim_Tot_Teeth_Present, color=Case))+geom_violin()+geom_boxplot(width=0.2)+geom_jitter()+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+theme_classic()+stat_compare_means(label.y=25)+ggtitle('Primary teeth present & case status')+ylab('Primary teeth present (count)')+theme(text=element_text(size=14))+theme(legend.position='none')
 
 prim_teeth<-plot_grid(plot_grid(case_teeth, cst_prim, nrow=1, labels=c('A', 'B'), rel_widths=c(0.3, 0.7), align='h', axis='tb'), net_teeth, nrow=2, labels=c('', 'C'))
 ```
 
-```{r FIG 17, include=F}
-ggsave(prim_teeth, file=file.path(supp.out, 'SupplementalFigure17.pdf'), height=12, width=25)
+```{r FIG 16, fig.cap='Relationships between unsupervised clusters and the number of primary teeth', fig.height=12, fig.width=25}
+ggsave(prim_teeth, file=file.path(supp.out, 'SupplementalFigure16.pdf'), height=12, width=25)
 prim_teeth
 ```
 
@@ -838,26 +863,29 @@ ggsave(taxa_volc, filename=file.path(supp.out, 'taxaVolcano.pdf'), units=c('in')
 
 t3_table=t3%>%select(-ColorCode)%>%arrange(padj)
 
+t_nest=t3%>%filter(padj<0.05)%>%group_by(SampleType)%>%nest()
+saliva_and_plaque=t_nest$data[[1]]$Taxa[t_nest$data[[1]]$Taxa %in% t_nest$data[[2]]$Taxa]
+plaque_only=t_nest$data[[1]]$Taxa[!(t_nest$data[[1]]$Taxa %in% t_nest$data[[2]]$Taxa)]
+saliva_only=t_nest$data[[2]]$Taxa[!(t_nest$data[[2]]$Taxa %in% t_nest$data[[1]]$Taxa)]
 ```
 
-```{r TABLE 8}
-write.xlsx(t3_table, file=file.path(supp.out, 'SupplementalTable8.xlsx'), overwrite=T)
+```{r TABLE 9}
+write.xlsx(t3_table, file=file.path(supp.out, 'AdditionalFile8.xlsx'), overwrite=T)
 ```
 
-```{r FIG 18, include=F}
+```{r FIG 17, fig.cap='Volcano plot taxa differentially abundant between cases and controls in whole genome shotgun sequenced plaque and saliva samples', fig.width=8, fig.height=11}
 taxa_volc
-ggsave(taxa_volc, filename=file.path(supp.out, 'SupplementalFigure18.pdf'), units=c('in'), width=18, height=8)
+ggsave(taxa_volc, filename=file.path(supp.out, 'SupplementalFigure17.pdf'), units=c('in'), width=18, height=8)
 ```
 
-```{r Table 9}
+```{r Table 10}
 r3_table=r3%>%select(SampleType, KEGG, kname, baseMean, log2FoldChange, lfcSE, stat, pvalue, padj, PathAnnotation)%>%arrange(padj)
-write.xlsx(r3_table, file=file.path(supp.out, 'FunctionsDeseq2.xlsx'), overwrite = T)
+write.xlsx(r3_table, file=file.path(supp.out, 'AdditionalFile9.xlsx'), overwrite = T)
 ```
 
-Significant differences also existed in the abundance of KEGG pathways in both plaque and saliva samples by case status (Figure 3A; Supplemental Table 9). Among the top 20 most significantly different KEGG orthologs were additional KEGG orthologs with annotations to antibiotic production, antibiotic resistance and quorum sensing. Many KEGG orthologs significantly enriched in plaque samples annotated to metabolic or environmental information processing, including ABC transporters, transcription factors, and two component systems (Figure 3B). 
+Additional file 8 contains the results from the DESEQ2 analysis on the taxa from WGS sequenced plaque and saliva samples, including the log2 fold change and adjusted *P* values. Supplemental figure 16 presents the same information as a volcano plot. Additional file 9 contains the results from the DESEQ2 analysis of KEGG orthologs from WGS sequenced plaque and saliva samples while additional file 10 contains the result from GSEA (gene set enrichment) analysis if the KEGG pathways. 
 
-Functional differences sometimes reflect taxonomic differences. For example, all the case enriched KEGG orthologs annotating to oxidative phosphorylation were found only in the genus Candida (Supplemental Table 10 and Supplemental Figure 19). Candida was only present in case plaque samples. 
-
+Functional differences sometimes reflect taxonomic differences. For example, all the case enriched KEGG orthologs annotating to oxidative phosphorylation were found only in the genus Candida. For the 18 KEGG orthologs which were significantly different between cases and controls at a Benjamini-Hochberg corrected alpha of 0.05 and annotated to oxidative phosphorylation as their first KEGG pathway, additional file 11 shows the KEGG ortholog number, KEGG ortholog name, log2 fold change and all the taxonomic assignments for the contiguous sequences in which that KEGG ortholog was found. All the KEGG orthologs more abundant in cases were found only in either yeast or unclassified contiguous contigs, while the KEGG ortholgos more abundant in controls were found in bacterial species. Supplemental figure 17 shows the abundance of the species in which the KEGG orthologs were found.
 
 
 ```{r oxidative phosphorylation exploration}
@@ -873,13 +901,58 @@ op_table=left_join(r3%>%filter(padj<0.05 & PathAnnotation_01_3=='Oxidative phosp
 
 ```
 
-```{r FIG 19, include=F}
-ggsave(op_plot, filename=file.path(supp.out, 'oSupplementalFigure19.pdf'), units=c('in'), width=10, height=8)
+```{r FIG 18, fig.cap='Abundance of taxa responsible for oxidative phosphorylation KEGG orthologs differentially abundant between cases and controls in plaque samples', fig.height=8, fig.width=10}
+ggsave(op_plot, filename=file.path(supp.out, 'SupplementalFigure18.pdf'), units=c('in'), width=10, height=8)
 op_plot
 ```
 
-```{r Table 10}
-write.xlsx(op_table, file=file.path(supp.out, 'SupplementalTable9.xlsx'), overwrite = T)
+```{r Table 12}
+write.xlsx(op_table, file=file.path(supp.out, 'AdditionalFile11.xlsx'), overwrite = T)
 ```
 
+```{r enrichment analysis prep, eval=F}
+pathways.list=keggList('pathway')
+pathways.data=data.frame(pathway=names(pathways.list), pathwayNames=pathways.list, row.names=NULL)%>%mutate(pathway=gsub("path:", "", pathway))
+pathway.codes <- sub("path:", "", names(pathways.list)) 
+genes.by.pathway <- sapply(pathway.codes,
+    function(pwid){
+        pw <- tryCatch(keggGet(pwid), error=function(e) NULL)
+        pw<-tryCatch(keggGet(pw[[1]]$KO_PATHWAY), error=function(e) NULL)
+        if (is.null(pw[[1]]$ORTHOLOGY)) return(NA)
+        pw2 <- names(pw[[1]]$ORTHOLOGY) # may need to modify this to c(FALSE, TRUE) for other organisms
+        return(pw2)
+    }
+)
 
+pathway.size=genes.by.pathway%>%map_dbl(~length(.x))
+
+#get named log2FC in plaque and saliva samples
+r3_split=r3%>%group_by(SampleType)%>%nest()%>%dplyr::mutate(my_genes=map(data, ~.x %>%pull(log2FoldChange)), my_gene_names=map(data, ~.x %>%pull(KEGG)))
+r3_split=r3_split%>%mutate(my_genes=map2(my_gene_names, my_genes, ~.y%>%setNames(.x)))
+
+#run fgsea for plaque and saliva samples separately 
+r3_split = r3_split %>%
+  mutate(my_fgsea=map(my_genes, 
+                      ~fgsea(pathways=genes.by.pathway, 
+                             stats=.x, 
+                             minSize=1, 
+                             maxSize=600)))
+
+r3_split= r3_split %>% mutate(my_fgsea=
+                      map(my_fgsea, 
+                          ~left_join(.x, pathways.data)), 
+                      my_sig=
+                      map(my_fgsea, 
+                          ~.x%>%
+                          filter(padj<0.05)))
+
+enrichment_table=r3_split%>%mutate(my_fgsea=map(my_fgsea, ~.x%>%arrange(padj))) %>% dplyr::select(SampleType, my_fgsea)%>%unnest(cols=c(my_fgsea))%>%bind_rows()
+```
+
+```{r gsea}
+load(file.path(data.out, 'MS', 'keggpathways.Rdata'))
+
+
+write.xlsx(enrichment_table, file.path(supp.out, 'AdditionalFile10.xlsx'), overwrite=T)
+
+```
