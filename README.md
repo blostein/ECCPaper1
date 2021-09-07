@@ -1,5 +1,5 @@
 # ECCPaper1
-This is the code repository for the paper entitled " ". 
+This is the code repository for the paper entitled "Evaluating the ecological hypothesis: Early life salivary microbiome assembly predicts dental caries in a longitudinal case-control study". 
 
 # To run the pipeline in order
 
@@ -14,7 +14,7 @@ This is the code repository for the paper entitled " ".
      - Random forest fits when using transform = {hellinger, clr}   (COHRA data only) 
      - Weighted cooccurrence networks when using transform={hellinger, clr}
   
---3a) Run the code in the Metasqueeze folder to process whole metagenome data, run humann3 and run metasqueeze (COHRA data only)-- 
+--3a) Run the code in the WGS/WGSProcessing/ folder to process whole metagenome data, run humann3 and run metasqueeze (COHRA data only)-- 
 
 3) Run WGS/WGSMaster.R to take outputs from 3a and put them into nice formats for analysis and graphing in R & 
     run DeSEQ on case vs control abundances of KEGG orthologs and taxa (COHRA data only) 
