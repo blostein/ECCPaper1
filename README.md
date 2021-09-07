@@ -1,4 +1,4 @@
-# ECCPaper1
+#  Evaluating the ecological hypothesis: Early life salivary microbiome assembly predicts dental caries in a longitudinal case-control study
 This is the code repository for the paper entitled "Evaluating the ecological hypothesis: Early life salivary microbiome assembly predicts dental caries in a longitudinal case-control study". 
 
 # To run the pipeline in order
