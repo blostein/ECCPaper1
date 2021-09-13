@@ -108,24 +108,6 @@ load(file.path(data.out, 'MS', 'kegg_and_taxa_slim.Rdata'))
 #load humann3 object
 load(file.path(data.out, 'H3', 'Humann3.Rdata'))
 ```
-# Notes from meeting with kelly /To Dos
-
-## Prevacation 
-  x write master script to process whole genome data 
-  x put code on github 
-      - all except analysis and results.rmd done 
-  - do code run with deesha 
-       - Make sure that paths are all set for transfer 
-       x def have to change paths in run wgs (make wgs and then make sure it points to the right place 
-       
-  - write supplement
-  - betsy edits
-
-## Post vacation  
-  - edit graphical abstract
-  - fix citations
-  - put sequences on archive 
-  
 
 # At 12- and 24-months of age, supervised random forest using the salivary bacteriome is more accurate at predicting ECC case status than *S. mutans* alone 
 
