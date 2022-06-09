@@ -85,6 +85,30 @@ if(keepDouble==T){MV=MetaVisit}
 if(keepDouble==F){MV=MetaVisit%>%filter(count!='Double; drop')}
 ```
 
+# Figure 1
+```{r}
+figure1=MetaVisit %>%
+  filter(HasCleanSample==1 & Visit<=IncidentVisit2)%>%
+  select(Visit, AgeAtExamMonths, UniqueID, Case, IncidentVisit2, sample_in_wgs)%>%
+  mutate(sample_type=factor(
+    case_when(Visit==IncidentVisit2 &
+                sample_in_wgs=="Sample in shotgun sequenced subset"~'Incident visit sample (16S amplicon & WGS)', 
+              Visit==IncidentVisit2 &
+                sample_in_wgs!="Sample in shotgun sequenced subset"~'Incident visit sample (16S amplicon)',
+                Visit<IncidentVisit2~'Pre-incident visit sample (16S amplicon)'), 
+                levels=c('Pre-incident visit sample (16S amplicon)', 'Incident visit sample (16S amplicon)', 'Incident visit sample (16S amplicon & WGS)')))%>%
+  unique()%>%
+  ggplot(aes(x=AgeAtExamMonths))+
+  geom_histogram(aes(fill=as.factor(sample_type)))+ theme_bw()+
+  scale_x_continuous('Age (months)', breaks = c(0, 2, 9, 12, 24, 36, 48, 60))+
+  theme(legend.position=c(0.8, 0.85))+
+  scale_fill_manual('', values=c('grey', 'grey50', 'black'))+
+  theme(text=element_text(size=20))
+
+ggsave(filename=file.path(main.out, 'Figure1.pdf'), figure1, units=c('in'), width=16, height=6)
+```
+
+
 ```{r load data supervised and unsupervised}
 unsupervised_files<-c(list.files(file.path(data.out, 'Network'), full.names = T), list.files(file.path(data.out, 'CST'), full.names = T)[-1])
 
@@ -113,7 +137,9 @@ load(file.path(data.out, 'H3', 'Humann3.Rdata'))
 
 ```{r randomForest - fig1}
 #Fig1A: area under the curve roc
-rf_roc<-rfAllEvals_hellinger$roc$data
+rf_roc<-rfAllEvals_hellinger$roc$data%>%
+  #filter out S mutans models -- per reviewer
+  filter(!str_detect(Group, 'S. mutans'))
 fig1a<-ggplot(rf_roc, aes(x=FPR, y=SENS, color=Group, linetype=Group))+geom_line(size=1.2)+scale_color_manual(name='', values=c('black', 'grey63', 'black', 'grey63'))+scale_linetype_manual(name='', values=c(1, 1, 3, 3))+xlab('False positive rate')+ylab('True positive rate')+theme_classic()+theme(legend.text=element_text(face='italic'))+theme(legend.text=element_text(face='italic'))+guides(color=guide_legend(nrow=2,byrow=TRUE), linetype=guide_legend(nrow=2,byrow=TRUE))+theme(legend.position='bottom')+geom_abline(slope=1, intercept = 0, color='darkgrey')+coord_fixed()
 #fig1b: importance of ASVs
 #importance of ASVs
@@ -123,9 +149,17 @@ greater_mean=ps_long %>% filter(Visit %in% c(5, 7))%>%dplyr::group_by(OTU, Visit
 #join 
 imp=left_join(imp, greater_mean)
 imp_top=rbind(imp%>%dplyr::group_by(Visit)%>%slice_max(n=10, order_by=MeanDecreaseGini), imp%>%filter(str_detect(ScientificName, 'mutans')))
+
+imp_top=imp_top %>%
+    group_by(ScientificName)%>%
+    mutate(neg=ifelse(GreaterMean=='Case', -1, 1),
+           max=max(MeanDecreaseGini)*neg)%>%
+  mutate(SciName=fct_reorder(ScientificName, max))
+
+sciname_order=imp_top%>%arrange(max)%>%pull(SciName)%>%unique()
 #fig 1b plot
 fig1b=imp_top%>%   
-  ggplot(aes(x=fct_rev(ScientificName), ymax=MeanDecreaseGini, ymin=0, color=GreaterMean)) +
+  ggplot(aes(x=fct_reorder(SciName, max), ymax=MeanDecreaseGini, ymin=0, color=GreaterMean)) +
     geom_point(aes(y=MeanDecreaseGini, color=GreaterMean, shape=GreaterMean), size=2)+
     geom_linerange()+coord_flip()+facet_grid(.~Month,scales='free_y')+
     theme_classic()+theme(axis.text.y=element_text(face='italic'))+
@@ -135,10 +169,14 @@ fig1b=imp_top%>%
     scale_shape_manual(name='Mean relative abundance greater in:\n', values=c('triangle', 'square'))
 
 #fig1c abundance of top important taxa
-fig1c=ps_long%>%filter(Visit %in% c(5, 7) & OTU %in% imp_top$OTU)%>%dplyr::mutate(Month=ifelse(Visit==5, '12 month', '24 month'))%>%ggplot(aes(x=sqrt(Abundance), y=Case, fill=Case))+geom_joy()+facet_grid(ScientificName~Month, scales='free')+theme_classic()+theme(axis.text.y=element_blank(), axis.ticks.y = element_blank(), axis.title.y=element_blank(), strip.text.y=element_blank())+scale_fill_manual(name='ECC case status: ', values=c('black', 'darkgrey'))+theme(legend.position='bottom')+xlab('Square root(Relative abundance)')
+fig1c=ps_long%>%
+  filter(Visit %in% c(5, 7) & OTU %in% imp_top$OTU)%>%
+  dplyr::mutate(Month=ifelse(Visit==5, '12 month', '24 month'),
+                SciName=factor(ScientificName, levels=rev(sciname_order)))%>%
+  ggplot(aes(x=sqrt(Abundance), y=Case, fill=Case))+geom_joy()+facet_grid(SciName~Month, scales='free')+theme_classic()+theme(axis.text.y=element_blank(), axis.ticks.y = element_blank(), axis.title.y=element_blank(), strip.text.y=element_blank())+scale_fill_manual(name='ECC case status: ', values=c('black', 'darkgrey'))+theme(legend.position='bottom')+xlab('Square root(Relative abundance)')
 #combine and save
 fig1=fig1a+fig1b+fig1c+plot_annotation(tag_levels='A')
-ggsave(filename=file.path(main.out, 'Figure1.eps'), fig1, units=c('in'), width=16, height=6)
+ggsave(filename=file.path(main.out, 'Figure2.eps'), fig1, units=c('in'), width=16, height=6)
 
 rm(fig1, fig1a, fig1b, fig1c)
 
@@ -177,21 +215,26 @@ CST<-CST1 %>% select(UniquePersonID, BabySubjectID, Site, Case, IncidentVisit2, 
 CST.wide<-reshape2::dcast(CST, UniquePersonID+BabySubjectID+Site+Case+IncidentVisit2~Visit, value.var="CST.8")
 data.long<-gather(CST.wide, "Visit","CST", 6:11)
 data.long$Visit<-as.numeric(data.long$Visit)
-data.long$CST2<-with(data.long, ifelse(IncidentVisit2<Visit, ifelse(Case=="Control", "Ended as control", "Ended as case"), CST))
+#remove ended as case ended as control from fig 2a and replace with 'no microbiome data 
+#data.long$CST2<-with(data.long, ifelse(IncidentVisit2<Visit, ifelse(Case=="Control", "Ended as control", "Ended as case"), CST))
+data.long$CST2<-with(data.long, ifelse(IncidentVisit2<Visit, "No microbiome data", CST))
 data.wide<- reshape2::dcast(data.long, UniquePersonID+BabySubjectID+Site+Case+IncidentVisit2 ~ Visit, value.var="CST2")
 colnames(data.wide)[6:11]<-c( "V3", "V5", "V7","V8", "V9", "V10")
 CST.wide<-data.wide %>% dplyr::count(V3, V5, V7, V8, V9, V10, Case)
-CST.wide[is.na(CST.wide)]<- "Missed Visit"
+CST.wide[is.na(CST.wide)]<- "No microbiome data"
 CST.visit<-to_lodes_form(CST.wide, axes=1:6, id="cohort")
 CST.visit2<-CST.visit %>% dplyr::group_by(Case, x) %>% dplyr::mutate(denom = sum(n))
 CST.visit2<-CST.visit2 %>% dplyr::group_by(Case, x, stratum) %>% dplyr::mutate(num = sum(n))
 CST.visit2<-CST.visit2 %>% ungroup() %>% dplyr::mutate(prop=num/denom)
 CST.visit2<-CST.visit %>% group_by(Case, x) %>% dplyr::mutate(prop=n/sum(n))
-CST.visit2$stratum<-recode_factor(CST.visit2$stratum, `3`='Streptococcus ASV1 dominated w/ Gemella ASV2',`5`='Gemella ASV2 - H. parainfluenzae-Neisseria ASV9', `2`='H. parainfluenzae - Neisseria ASV9', `4`='Streptoccous ASV1 dominated w/ G. elegans',  `6`='Streptococcus ASV8 - Neisseria ASV12',  `1`='Neisseria ASV12 - Veillonella ASV5', 'Ended as control'='Ended as control', 'Ended as case'='Ended as case', 'Missed Visit'="Missed visit", "Unclassified"="Unclassified at P>80%")
+CST.visit2$stratum<-recode_factor(CST.visit2$stratum, `3`='Streptococcus ASV1 dominated w/ Gemella ASV2',`5`='Gemella ASV2 - H. parainfluenzae-Neisseria ASV9', `2`='H. parainfluenzae - Neisseria ASV9', `4`='Streptoccous ASV1 dominated w/ G. elegans',  `6`='Streptococcus ASV8 - Neisseria ASV12',  `1`='Neisseria ASV12 - Veillonella ASV5', 'Ended as control'='Ended as control', 'Ended as case'='Ended as case', "No microbiome data"="No microbiome data", "Unclassified"="Unclassified at P>80%")
 
 #count n samples for labels
-count_n=CST.visit2%>%filter(!(stratum %in% c('Ended as control', 'Ended as case', 'Missed visit')))%>%select(-cohort, -prop, -stratum)%>%group_by(Case, x)%>%dplyr::summarise(n=sum(n))
+count_n=CST.visit2%>%filter(!(stratum %in% c('Ended as control', 'Ended as case', "No microbiome data")))%>%select(-cohort, -prop, -stratum)%>%group_by(Case, x)%>%dplyr::summarise(n=sum(n))
 count_n$stratum='Missed visit'; count_n$cohort=1
+
+colors_with_case=c("thistle","deepskyblue", "royalblue2", "lightcoral",  "darkorange",   "darkorange3",  "royalblue4", "darkorange4", 'white', 'black')
+colors_no_case=c("thistle","deepskyblue", "royalblue2", "lightcoral",  "darkorange",   "darkorange3",  'white', 'black',  "royalblue4", "darkorange4")
 
 fig2a<-ggplot(CST.visit2,
        aes(x = x, stratum = stratum, alluvium = cohort,
@@ -201,20 +244,30 @@ fig2a<-ggplot(CST.visit2,
     stat_stratum(width=.5)+geom_flow(alpha=.7)+geom_stratum(width=.5)+
     facet_grid(Case~.)+
     scale_x_discrete(name="Age (months)", labels=visit_labelsV2, expand=c(.1, .1))+
-    scale_fill_manual(name="Community state type", breaks=levels(CST.visit2$stratum), values=c("thistle","deepskyblue", "royalblue2", "lightcoral",  "darkorange",   "darkorange3",  "royalblue4", "darkorange4", 'grey', 'black'), guide=guide_legend(nrow=2))+
+    scale_fill_manual(name="Community state type", breaks=levels(CST.visit2$stratum), values=colors_no_case, guide=guide_legend(nrow=2))+
     scale_y_continuous(name="Proportion", limits=c(0, 1.1), breaks=seq(0, 1, 0.2))+theme_classic()+
     theme(legend.position="bottom")+guides(fill=guide_legend(ncol =1,byrow=TRUE))+
     theme(text=element_text(size=20))+theme(axis.text.x=element_text(angle = 45, vjust = 0.5, hjust=.5))+
     theme(legend.text = element_text(face='italic', size=12))
+
+cairo_ps(file.path(main.out, 'Figure3.eps'), family='Arial', width=10, height=8)
+fig2a
+dev.off()
+cairo_pdf(file.path(main.out, 'Figure3.pdf'), family='Arial', width=10, height=8)
+fig2a
+dev.off()
 ```
 
 ```{r unsupervised guilds networks - fig 2b}
 #Pick top genera to color
-topGenus<-c('Streptococcus', 'Neisseria', 'Veillonella', 'Fusobacterium', 'Haemophilus', 'Prevotella', 'Gemella', 'Actinomyces')
+topGenus<-c('Streptococcus', 'Neisseria', 'Veillonella', 'Fusobacterium', 'Haemophilus', 'Rothia', 'Prevotella', 'Actinomyces' )
 genus_colors=c(scales::hue_pal()(8), 'black')
+genus_colors[3]="#910C00"
 names(genus_colors)=c(topGenus, 'Other')
 #Pick top taxa to label 
-topTax<- c('Fusobacterium periodonticum', 'Haemophilus parainfluenzae', 'Prevotella nanceinsis', 'Neisseria ASV9', 'Veillonella ASV5', 'Streptococcus ASV8', 'Prevotella histcola', 'Prevotella salivae', 'Prevotella melaninogenica', 'Streptococcus mutans', 'Fusobacterium nucleatum_subsp._animalis', imp_top%>%pull(ScientificName), hellinger_network$intraStats%>%group_by(module)%>%slice_max(n=2, order_by=kWithin)%>%pull(ScientificName))
+br_yel_cohra<-hellinger_network$intraStats%>%filter(module%in% c('brown', 'yellow'))%>%pull(ScientificName)
+by_cohra=br_yel_cohra[!str_detect(br_yel_cohra, 'ASV')]
+topTax<- c('Fusobacterium periodonticum', 'Haemophilus parainfluenzae', 'Prevotella nanceinsis', 'Neisseria ASV9', 'Veillonella ASV5', 'Streptococcus ASV8', 'Prevotella histcola', 'Prevotella salivae', 'Prevotella melaninogenica', 'Streptococcus mutans', 'Fusobacterium nucleatum_subsp._animalis', 'Veilonella dispar', imp_top%>%pull(ScientificName), hellinger_network$intraStats%>%group_by(module)%>%slice_max(n=2, order_by=kWithin)%>%pull(ScientificName), by_cohra)
 #load extra fonts
 extrafont::loadfonts()
 #abundance info
@@ -224,7 +277,7 @@ nw<-hellinger_network
 source(file.path(code.dir, 'Analysis', 'createTidyGraph.R'))
 
 #plot networks 
-network_plot=gg_whole%>%activate(nodes) %>%dplyr::mutate(ScientificNameLabel=ifelse(name %in% imp_top$ASV, paste(ScientificNameLabel, '*'), ScientificNameLabel)) %>%filter(module %in% c('brown', 'yellow'))%>%dplyr::mutate(module=factor(module, levels=c('yellow', 'brown')))%>%ggraph('nicely')+geom_edge_link(aes(width=weight), alpha=0.8, color='grey')+geom_node_point(aes(color=GenusLabel, size=m, shape=factor(as)))+geom_node_text(aes(label=ScientificNameLabel), fontface='italic', family='Times', repel=TRUE, size=3)+guides(size=FALSE, edge_color=FALSE, color=guide_legend(nrow=2,byrow=TRUE), edge_width=FALSE)+scale_color_manual('', values=genus_colors)+scale_shape_manual('', values=c('triangle', 'square'))+theme_graph(base_family='sans')+theme(legend.position = 'bottom')+scale_edge_width(range = c(0.1, 2))+facet_nodes(~module, scales='free')+scale_size(range=c(2, 8))+theme(strip.text.x = element_blank())+theme(text=element_text(face='italic'))
+network_plot=gg_whole%>%activate(nodes) %>%dplyr::mutate(ScientificNameLabel=ifelse(name %in% imp_top$ASV, paste(ScientificNameLabel, '*'), ScientificNameLabel)) %>%filter(module %in% c('brown', 'yellow'))%>%dplyr::mutate(module=factor(module, levels=c('yellow', 'brown')))%>%ggraph('nicely')+geom_edge_link(aes(width=weight), alpha=0.8, color='grey')+geom_node_point(aes(color=GenusLabel, size=m, shape=factor(as)))+geom_node_text(aes(label=ScientificNameLabel), fontface='italic', family='Times', repel=TRUE, size=3)+guides(size=FALSE, edge_color=FALSE, color=FALSE, edge_width=FALSE)+scale_color_manual('', values=genus_colors)+scale_shape_manual('', values=c('triangle', 'square'))+theme_graph(base_family='sans')+theme(legend.position = 'bottom')+scale_edge_width(range = c(0.1, 2))+facet_nodes(~module, scales='free')+scale_size(range=c(2, 8))+theme(strip.text.x = element_blank())+theme(text=element_text(face='italic'))
 
 network_n=hellinger_network$module.data%>%filter(moduleColor %in% c('brown', 'yellow') & Visit<=IncidentVisit2)%>%group_by(moduleColor, Visit, Case)%>%dplyr::summarise(n=n())%>%pivot_wider(names_from=Case, values_from=n)%>%dplyr::mutate(modAbund=1, label=paste0('Case n=', Case, '\n Control n=', Control), Case='case')%>%filter(Visit %in% c(3, 5, 7, 8, 9, 10))%>%dplyr::mutate(Visit=as.factor(Visit))
 #plot change over time 
@@ -239,16 +292,6 @@ network_overtime=ggplot(hellinger_network$module.data%>%filter(Visit %in% c(3, 5
 fig2b=plot_grid(network_overtime, network_plot, ncol=1, labels=c('B', 'C'))
 ```
 
-```{r figure 2}
-fig2=plot_grid(fig2a, fig2b, ncol=2, labels=c('A', ''))
-
-cairo_ps(file.path(main.out, 'Figure2.eps'), family='Arial', width=18, height=10)
-fig2
-dev.off()
-cairo_pdf(file.path(main.out, 'Figure2.pdf'), family='Arial', width=18, height=10)
-fig2
-dev.off()
-```
 
 ## Communities identified through unsupervised clustering are reproducible in an external cohort
 
@@ -285,11 +328,189 @@ bVSb=shared_taxa %>%filter(cohra=='brown'& prj=='brown')
 yVSt=shared_taxa %>%filter(cohra=='yellow'& prj=='turquoise')
 ```
 
+
+```{r fig 2d}
+prj$ps_long=microbiome::transform(prj$prj.filter, 'compositional')%>%psmelt()%>%mutate(ScientificName=paste(Genus, ifelse(is.na(Species), OTU, Species), sep=' '))
+
+nw<-prj$hellinger_network
+my_df=prj$ps_long%>% group_by(OTU)%>%dplyr::summarise(m=mean(Abundance))%>%mutate(name=OTU)
+source(file.path(code.dir, 'Analysis', 'createTidyGraph.R'))
+
+matching_networks<-gg_whole%>%
+  activate(edges)%>%filter(weight>0.03)%>%
+  activate(nodes)%>%
+  filter(module %in% c('turquoise', 'brown'))%>%
+  mutate(module=factor(module, levels=c('turquoise', 'brown'))) %>%
+  filter(!node_is_isolated())%>%
+  ggraph('nicely')+
+  geom_edge_link(aes(width=weight, alpha=weight), alpha=0.8, color='grey')+
+  geom_node_point(aes(color=GenusLabel, size=m))+
+  geom_node_text(aes(
+    label=ifelse(m>0.01 & !str_detect(ScientificNameLabel, 'ASV'), ScientificNameLabel, 
+                 ifelse(ScientificName %in% c(by_cohra, "Veillonella dispar"), ScientificNameLabel, ''))),
+    fontface='italic', family='Times', 
+    repel=TRUE, size=3, max.overlaps=Inf, 
+    xlim = c(-Inf, NA), ylim = c(-Inf, Inf))+
+  guides(size=FALSE, edge_color=FALSE, color=guide_legend(nrow=2,byrow=TRUE), edge_width=FALSE)+
+  scale_color_manual('', values=genus_colors)+
+  theme_graph(base_family='sans')+theme(legend.position = 'bottom')+
+  scale_edge_width(range = c(0.1, 2))+
+  scale_size_continuous(range = c(.5, 3)) +
+  theme(strip.text.x = element_blank())+
+  theme(text=element_text(face='italic'))+
+  facet_nodes(~module_label2, scales='free')+
+  coord_cartesian(clip = "off")
+
+```
+
+
+```{r figure 3}
+
+fig3=plot_grid(network_overtime, network_plot, matching_networks, ncol=1, labels=c('A', 'B', 'C'), rel_heights=c(.3, .3, .4))
+
+
+
+cairo_ps(file.path(main.out, 'Figure4.eps'), family='Arial', width=12, height=16)
+fig3
+dev.off()
+cairo_pdf(file.path(main.out, 'Figure4.pdf'), family='Arial', width=12, height=16)
+fig3
+dev.off()
+```
+
 To examine the reproducibility of these identified groupings of salivary bacteria, we subjected publicly available data from a longitudinal cohort of similarly aged children with 16S sequenced saliva samples to the same analytic pipeline [Holgerson *et al.*; PRJ]. 
 
 In the Holgerson *et al.* sample, `r prj$hellinger_network$moduleNum` network modules were identified (Supplemental Table XX). Among these was a network module including among it's most abundant members *Neisseria flavescens*, *Neisseria perflava*, and *Haemophilus parainfluenzae*, with central taxa *Fusobacterium periodonticum*. This was the network module with the most most member ASVs, and included many *Haemophilus*, *Neisseria* and *Streptococcus* ASVs.  `r yVSt$n_common` of the `r yVSt$n_cohra`(`r round(yVSt$p_sharedC, 2)*100`%) ASVs identified to the species level in the corresponding *Haemophilus parainfluenzae-Neisseria* ASV9 COHRA2 network were members of this Holgerson *et al.* network. The *Neisseria* ASV9 amplicon from the COHRA cohort closely related to the *Neiseria perflava* from the Holgerson *et al.* cohort  (Supplemental Figure XX). 
 
 A *Veillonella-Streptococcus* network was also identified in the Holgerson *et al.* cohort. Like its counterpart in the COHRA2 cohort, this network included many *Prevotella* and *Actinomyces* ASVs.  `r bVSb$n_common` of the `r bVSb$n_cohra` (`r round(bVSb$p_sharedC, 2)*100`%) ASVs identified to the species level in the corresponding COHRA2 network were also members of this Holgerson *et al.* network. of them were in this PRJ network module. The *Veillonella ASV5* amplicon from the COHRA cohort was closely related to the *Veillonella dispar* amplicon from this Holgerson *et al.* (Supplemental Figure XX). 
+
+```{r}
+network_models=hellinger_network$module.data%>%
+  left_join(MetaVisit)%>%
+  mutate(case_numeric=ifelse(Case=='Case', 1, 0),
+         IncidentVisit2f=factor(IncidentVisit2, levels=c(8, 7, 5, 9, 10), 
+                               labels=c('36mos', '24mos', '12mos', '48 mos', '60 mos')),
+         modAbund100=modAbund*100)
+
+net_models=network_models %>% 
+   filter(Visit != IncidentVisit2)%>%
+  group_by(module, moduleColor,
+           module_label, module_label2, 
+           module_label3,Visit)%>%
+  nest()%>%
+  filter(Visit %in% c(3, 5, 7))%>%
+  mutate(model_unadjusted=map(data, 
+                              ~glm(case_numeric~modAbund100, data=.x,
+                                  family='binomial')),
+         model_adjusted=map(data,
+                            ~glm(case_numeric~modAbund100+
+                                  BFCurrent+
+                                  antibiotics_within_3mos_of_visit+
+                                  Prim_Tot_Teeth_Present+
+                                  Delivery+
+                                  Education_HS+
+                                  IncidentVisit2f, data=.x,
+                                family='binomial')))%>%
+  mutate(adjusted_tidy=map(model_adjusted, tidy, 
+                           conf.int=T, exponentiate = T), 
+         unadjusted_tidy=map(model_unadjusted, tidy, 
+                             conf.int=T, exponentiate = T))
+
+net_models%>%
+  filter(module %in% c('yellow', 'brown'))%>%
+  ungroup()%>%
+  unnest(adjusted_tidy)%>%
+  select(module_label3, Visit, term, estimate, conf.low, conf.high, p.value)%>%
+  filter(p.value<0.05)
+
+make_table=function(x, predictor='net'){
+  variable_list=list(modAbund100 ~ 'Summed network module relative abundance (ranging from 0 to 100)', 
+                BFCurrent ~ 'Breastfeeding status', 
+                antibiotics_within_3mos_of_visit~'Child received antibiotics within 3 mos prior to visit', 
+                Prim_Tot_Teeth_Present~'Count of primary teeth emerged', 
+                Delivery ~ 'Birth delivery mode', 
+                Education_HS ~ 'Maternal education at prenatal visit',
+                IncidentVisit2f~'Visit of case diagnosis/control matching')
+  if(predictor=='cst'){variable_list[[1]]=CST.8f~'Community state type'}
+  x %>% 
+     tbl_regression(
+    exponentiate = TRUE, 
+    pvalue_fun = ~style_pvalue(.x, digits = 2),
+    label= variable_list
+  ) %>% 
+  add_global_p() %>%
+  bold_p(t = 0.05) %>%
+    add_n(location='level')
+}
+
+my_net_models=net_models %>% 
+  filter(module %in% c('brown', 'yellow') & Visit %in% c(5, 7))%>%
+  mutate(adjusted_table=map(model_adjusted, ~make_table(.x)), 
+         Visit=case_when(Visit==5~'12mos', 
+                         Visit==7~'24mos'), 
+         label=paste0(module_label2, '\n', Visit))%>%
+  arrange(module, Visit)
+  
+
+tbl_merge(my_net_models$adjusted_table, 
+            tab_spanner=my_net_models$label) 
+  
+cst_models=CST1%>%
+  left_join(MetaVisit)%>%
+  mutate(case_numeric=ifelse(Case=='Case', 1, 0), 
+         IncidentVisit2f=factor(IncidentVisit2, 
+                                levels=c(8, 7, 5, 9, 10), 
+                                labels=c('36mos', '24mos', '12mos',
+                                         '48mos', '60mos')),
+         CST.8f=recode_factor(CST.8,
+                              `2`='H. parainfluenzae - Neisseria ASV9', 
+                              `4`='Streptoccous ASV1 dominated w/ G. elegans', 
+                              `6`='Streptococcus ASV8 - Neisseria ASV12', 
+                              `1`='Neisseria ASV12 - Veillonella ASV5', 
+                              `3`='Streptococcus ASV1 dominated w/ Gemella ASV2',
+                              `5`='Gemella ASV2 - H. parainfluenzae-Neisseria ASV9' ))
+
+my_cst_models=cst_models %>% 
+  filter(Visit != IncidentVisit2 & 
+           CST.8f!='Unclassified')%>%
+  group_by(Visit)%>%
+  nest()%>%
+  filter(Visit %in% c(3, 5, 7))%>%
+  mutate(data =if(Visit==5) 
+    map(data, ~.x %>%mutate(CST.8f=relevel(CST.8f, ref='Gemella ASV2 - H. parainfluenzae-Neisseria ASV9')))
+    else map(data, ~.x))%>%
+  mutate(model_unadjusted=map(data, 
+                              ~glm(case_numeric~CST.8f, data=.x,
+                                  family='binomial')),
+         model_adjusted=map(data,
+                            ~glm(case_numeric~CST.8f+
+                                  BFCurrent+
+                                  antibiotics_within_3mos_of_visit+
+                                  Prim_Tot_Teeth_Present+
+                                  Delivery+
+                                  Education_HS+
+                                  IncidentVisit2f, data=.x,
+                                family='binomial')))%>%
+  mutate(adjusted_tidy=map(model_adjusted, tidy, 
+                           conf.int=T, exponentiate = T), 
+         unadjusted_tidy=map(model_unadjusted, tidy, 
+                             conf.int=T, exponentiate = T))
+
+my_cst_models %>%
+  ungroup()%>%
+  unnest(adjusted_tidy)%>%
+  select( Visit, term, estimate, conf.low, conf.high, p.value)%>%
+  filter(p.value<0.05)
+
+my_cst_models=my_cst_models %>% 
+  filter(Visit %in% c(5, 7))%>%
+  mutate(adjusted_table=map(model_adjusted, ~make_table(.x, predictor='cst')), 
+         label=case_when(Visit==5~'12mos', 
+                         Visit==7~'24mos'))
+tbl_merge(my_cst_models$adjusted_table, 
+            tab_spanner=my_cst_models$label) 
+```
+
 
 # ECC-associated guilds associate with concurrent salivary pH and future *S. mutans* prevalence 
 
@@ -306,34 +527,101 @@ network_data=hellinger_network$module.data%>%ungroup()%>%unique()%>%
 table1=left_join(MV, left_join(network_data, 
                                left_join(main_cst, cst_recodes)))%>%
                   left_join(div%>%
-              dplyr::select(FoxCavID, Chao1, Shannon, smutAbundance,
-                            smutPrevalence))
+              dplyr::select(FoxCavID, Chao1, Shannon,
+                            Abundance_Streptococcus_mutans,
+                            Prevalence_Streptococcus_mutans, 
+                            Abundance_Scardovia_wiggsiae, 
+                            Prevalence_Scardovia_wiggsiae))
 
 table1.noincident=table1 %>%filter(Visit < IncidentVisit2)
 table2.incident=table1 %>% filter(Visit==IncidentVisit2)
-
-res<-compareGroups(Case~Shannon+Chao1+`Streptococcus ASV1 & Neisseria ASV12 network`+`Haemophilus parainfluenzae & Neisseria ASV9 network`+`Veillonella ASV5 & Streptococcus ASV8 network`+`Veillonella sp._HMT_780 & Granulicatella elegans network`+`Gemella ASV2 & Leptotrichia shahii network`+CSTlabels+smutPrevalence+smutAbundance,data=table1.noincident%>%filter(Visit%in% c(3, 5, 7)), include.miss=F)
-strata.res=strataTable(createTable(res), 'Visit')
-#loop over visits of interest and add to xlsx files 
-visits=c(3, 5, 7)
-for(i in 1:length(visits)){
-  data=table1.noincident%>% filter(Visit==visits[i])
-  res=createTable(compareGroups(Case~Shannon+Chao1+`Streptococcus ASV1 & Neisseria ASV12 network`+`Haemophilus parainfluenzae & Neisseria ASV9 network` +
-                `Veillonella ASV5 & Streptococcus ASV8 network`+`Veillonella sp._HMT_780 & Granulicatella elegans network`+
-                  `Gemella ASV2 & Leptotrichia shahii network`+CSTlabels+smutPrevalence+smutAbundance,data=data, include.miss=F))
-  export2xls(res, file=file.path(main.out, paste0('Table1_v', visits[i], '.xlsx')))
-}
-
-
 ```
+
+```{table 1, eval=F }
+theme_gtsummary_compact()
+gt_table1=table1.noincident%>%
+  filter(Visit %in% c(3,5 ,7))%>%
+  mutate(Visit=factor(Visit, levels=c(3, 5, 7), 
+                      labels=c('~2-month visit', '~12-month visit',
+                                '~24-month visit')))%>%
+  select(Visit, Case, Shannon, Chao1, 
+         Abundance_Streptococcus_mutans,
+         Prevalence_Streptococcus_mutans,
+         Abundance_Scardovia_wiggsiae,
+         Prevalence_Scardovia_wiggsiae, BabyRace, BabySex, Site,
+         BFCurrent, antibiotics_within_3mos_of_visit, 
+         Prim_Tot_Teeth_Present, Delivery, 
+         Education_HS)%>%
+  tbl_strata(strata=Visit,
+             .tbl_fun=~.x %>% 
+               tbl_summary(by=Case,
+                           type = list(Prim_Tot_Teeth_Present ~ "continuous",
+                                       Abundance_Streptococcus_mutans~'continuous', 
+                                       Abundance_Scardovia_wiggsiae~'continuous', 
+                                       Prevalence_Streptococcus_mutans~'categorical', 
+                                       Prevalence_Scardovia_wiggsiae~'categorical'), 
+                           digits = all_continuous() ~ 1,
+                           label = list(BabySex~"Child's sex", 
+                                        BabyRace~"Child's race", 
+                                        Education_HS~'Maternal education reported at prenatal visit', 
+                                        Delivery~"Delivery", 
+                                        Prim_Tot_Teeth_Present~'Count of primary teeth erupted',  
+                                        antibiotics_within_3mos_of_visit~'Maternal report of child antibiotics within 3 mos prior to visit',
+                                        BFCurrent~'Currently breastfed',
+                                      Abundance_Streptococcus_mutans~'S. mutans abundance', 
+                           Prevalence_Streptococcus_mutans~'S. mutans ASV detected', 
+                           Abundance_Scardovia_wiggsiae~'S. wiggsiae abundance', 
+                           Prevalence_Scardovia_wiggsiae~'S. wiggsiae ASV detected'),
+                           statistic = list(all_continuous() ~ "{mean} ({sd})"))%>%
+               add_p())
+```
+
+```{r}
+incident_table=table2.incident%>%
+    filter(Visit %in% c(5, 7, 8, 9, 10))%>%
+    mutate(Visit=factor(Visit, levels=c(5, 7, 8, 9, 10), 
+                        labels=c('~12-month visit',
+                                 '~24-month visit', '36-month visit', '48-month visit', '60 month visit')))%>%
+    select(Visit, Case, Shannon, Chao1, 
+           Abundance_Streptococcus_mutans,
+           Prevalence_Streptococcus_mutans,
+           Abundance_Scardovia_wiggsiae,
+           Prevalence_Scardovia_wiggsiae, BabyRace, BabySex, Site,
+           BFCurrent, antibiotics_within_3mos_of_visit, 
+           Prim_Tot_Teeth_Present, Delivery, 
+           Education_HS)%>%
+    tbl_strata(strata=Visit,
+               .tbl_fun=~.x %>% 
+                   tbl_summary(by=Case,
+                               type = list(Shannon ~ 'continuous', Chao1~'continuous', Prim_Tot_Teeth_Present ~ "continuous",
+                                           Abundance_Streptococcus_mutans~'continuous', 
+                                           Abundance_Scardovia_wiggsiae~'continuous', 
+                                           Prevalence_Streptococcus_mutans~'categorical', 
+                                           Prevalence_Scardovia_wiggsiae~'categorical'), 
+                               digits = all_continuous() ~ 1,
+                               label = list(BabySex~"Child's sex", 
+                                            BabyRace~"Child's race", 
+                                            Education_HS~'Maternal education reported at prenatal visit', 
+                                            Delivery~"Delivery", 
+                                            Prim_Tot_Teeth_Present~'Count of primary teeth erupted',  
+                                            antibiotics_within_3mos_of_visit~'Maternal report of child antibiotics within 3 mos prior to visit',
+                                            BFCurrent~'Currently breastfed',
+                                            Abundance_Streptococcus_mutans~'S. mutans abundance', 
+                                            Prevalence_Streptococcus_mutans~'S. mutans ASV detected', 
+                                            Abundance_Scardovia_wiggsiae~'S. wiggsiae abundance', 
+                                            Prevalence_Scardovia_wiggsiae~'S. wiggsiae ASV detected'),
+                               statistic = list(all_continuous() ~ "{mean} ({sd})"))%>%
+                   add_p())
+```
+
+
 
 ```{r salivary pH future smutans}
 #create cst group variable for plotting
 netcst=left_join(left_join(hellinger_network$module.data, 
                                left_join(main_cst, cst_recodes)), MV)%>%
                   left_join(div%>%
-                            dplyr::select(FoxCavID, Chao1, Shannon, smutAbundance,
-                            smutPrevalence))%>%
+                            dplyr::select(FoxCavID, Chao1, Shannon, Abundance_Streptococcus_mutans,Prevalence_Streptococcus_mutans))%>%
         dplyr::mutate(CSTGroup=case_when(CST.8%in% c(1, 2)~'Late childhood CSTs', 
                                   CST.8 %in% c(3, 4)~"Infant CSTs", 
                                   CST.8 %in% c(5, 6)~'Early childhood CSTs'),
@@ -347,16 +635,16 @@ net_ph<-ggplot(netcst.57, aes(x=SalivapH, y=modAbund))+geom_point()+facet_grid(V
 cstph=ggplot(netcst.57%>%filter(moduleColor=='brown' & !is.na(CSTlabels)), aes(x=CSTlabels, y=SalivapH, color=CSTlabels))+geom_boxplot()+geom_jitter(alpha=0.5)+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+stat_compare_means(label.y=8.5)+theme_classic()+theme(axis.text.x = element_blank(), axis.title.x = element_blank())+theme(legend.position = 'bottom', legend.text = element_text(face='italic'))+scale_color_manual(name="", values=c("thistle","lightcoral", "deepskyblue",  "darkorange", "royalblue2", "darkorange3",  "royalblue4", "darkorange4", 'grey'), guide=guide_legend(nrow=2))+theme(legend.position = 'bottom')+stat_compare_means(label.y=8.5, label='p.format', comparisons=list(c("Gemella ASV2 - H. parainfluenzae - Neisseria ASV9", "Streptococcus ASV8 - Neisseria ASV12"), c("H. parainfluenzae - Neisseria ASV9", "Neisseria ASV12 - V. dispar"), c("Streptococcus ASV1 dominated w/ Gemella ASV2", "Streptoccous ASV1 dominated w/ G. elegans" )))+ggtitle('Salivary pH & CST')+theme(text=element_text(size=14))
 
 #lagged data for s mutans 
-netcst.lag<-netcst %>%group_by(BabySubjectID, moduleColor)%>%arrange(BabySubjectID, AgeAtExamMonths, moduleColor)%>%dplyr::mutate(modAbund.lag=lag(modAbund, n=1, default=NA, order_by=BabySubjectID), SalivapH.lag=lag(SalivapH, n=1, default=NA, order_by=BabySubjectID), smut.lag=lag(smutPrevalence, n=1, default=NA, order_by = BabySubjectID), CST.lag=lag(CSTlabels, n=1, default=NA, order_by=BabySubjectID), 
+netcst.lag<-netcst %>%group_by(BabySubjectID, moduleColor)%>%arrange(BabySubjectID, AgeAtExamMonths, moduleColor)%>%dplyr::mutate(modAbund.lag=lag(modAbund, n=1, default=NA, order_by=BabySubjectID), SalivapH.lag=lag(SalivapH, n=1, default=NA, order_by=BabySubjectID), smut.lag=lag(Prevalence_Streptococcus_mutans, n=1, default=NA, order_by = BabySubjectID), CST.lag=lag(CSTlabels, n=1, default=NA, order_by=BabySubjectID), 
 Dentobuff.lag=lag(Dentobuff, n=1, order_by=BabySubjectID, default = NA))
 
-smut_lag<-ggplot(netcst.lag %>% filter(moduleColor%in%c('brown', 'yellow')& Visit %in% c(7, 8)), aes(x=smutPrevalence, y=modAbund.lag))+facet_grid(Visit~module_label2, labeller=labeller(Visit=visit_labels2))+geom_boxplot()+theme_classic()+stat_compare_means()+ylab("Summed module abundance in the previous visit")+xlab("S. mutans 16S amplicon detected in saliva")+theme(axis.title.x = element_text(face='italic'))+theme(strip.text.x=element_text(face='italic'))+theme(text = element_text(size=14))
+smut_lag<-ggplot(netcst.lag %>% filter(moduleColor%in%c('brown', 'yellow')& Visit %in% c(7, 8)), aes(x=Prevalence_Streptococcus_mutans, y=modAbund.lag))+facet_grid(Visit~module_label2, labeller=labeller(Visit=visit_labels2))+geom_boxplot()+theme_classic()+stat_compare_means()+ylab("Summed module abundance in the previous visit")+xlab("S. mutans 16S amplicon detected in saliva")+theme(axis.title.x = element_text(face='italic'))+theme(strip.text.x=element_text(face='italic'))+theme(text = element_text(size=14))
 
 case_ph<-ggplot(MV %>% filter(Visit %in% c(5, 7)), aes(x=Case, y=SalivapH))+geom_boxplot()+stat_compare_means()+geom_jitter(alpha=0.5)+facet_grid(Visit~., labeller=labeller(Visit=visit_labels2))+theme_classic()+ylab("Salivary pH")+xlab("Early childhood caries case status")+theme(text=element_text(size=14))+theme(legend.position = c(0.1, 0.1))
 
 ph_smut<-plot_grid(plot_grid(case_ph, net_ph, ncol=2, rel_widths=c(0.2, 0.8), labels=c('A', 'B')), plot_grid(smut_lag, cstph, ncol=2, rel_widths=c(0.35, 0.65), labels=c('C', 'D')), ncol=1)
 
-ggsave(ph_smut, file=file.path(supp.out, 'SupplementalFigureSalivarypHSmutans.pdf'), height=12, width=25)
+ggsave(ph_smut, file=file.path(main.out, 'Figure4.pdf'), height=12, width=25)
 
 
 #cor function & purr mapping for correlations between network module abundance and pH  
@@ -394,7 +682,7 @@ Children who went on to have *S. mutans* amplicon detected in their saliva at th
 The trajectory of *S. mutans* over time was correlated with changes in important taxa from the unsupervised clustering techniques adn changes in the oral environment. For example, *F. periodonticum*, the central taxa of the *Neisseria-H. parainfluenzae* network, increased in abundance until 12-months of age (Figure 3A). *S. mutans* abundance only rose after 12-months, as did *S. sanguinis* abundance (Figure 3B). This may reflect the preference of *S. mutans* and *S. sanguinis* for hard surfaces: many children become dentulous at and after 9-months of age. The case-associated *S. mutans* abundance increase was also correlated over time with emergence of *Fusobacterium nucleatum subsp animalis*, a member of the same network cluster (Figure 3; Supplemental Figure XX). 
 
 
-```{r strep and fuso}
+```{r strep and fuso, eval=F}
 transformMethod<-"hellinger"
 ps.long<-microbiome::transform(ps_meta_nodups, transformMethod)%>%psmelt()%>%left_join(MV)
 
@@ -422,6 +710,27 @@ In a subsample of incident samples from 15 cases presenting with enamel lesions 
 #load data
 load(file.path(data.out, 'MS', 'deseqresults.Rdata'))
 load(file.path(data.out, 'MS', 'taxpathannotation.Rdata'))
+
+cbPalette_volc=c('red', "#E69F00", "#56B4E9", "#009E73", "darkblue", "#0072B2", "purple", "#CC79A7", "#00FF00", 'darkred', "#000000")
+taxa_of_interest=c('Neisseria perflava', 'Neisseria mucosa', 'Haemophilus parainfluenzae', 'Fusobacterium periodonticum', 'Fusobacterium nucleatum', 'Streptococcus sangunis', 'Prevotella salivae', 'Actinomyces graevenitzii', 'Streptococcus vestibularis', 'Prevotella histicola', 'Streptococcus sobrinus',
+                   'Lachnoanaerobaculum orale', 
+                   'Veillonella dispar', 
+                   'Veillonella parvula')
+t3=t3%>%mutate(label=ifelse(Taxa %in% taxa_of_interest & padj<0.05, Taxa, ifelse((-log10(pvalue)>10)|(-log10(pvalue)>10 & SampleType=='saliva') | (SampleType=='saliva' & log2FoldChange < -2), Taxa, '')))
+taxa_volc=ggplot(t3%>%filter(Taxa!='Unmapped'),
+       aes(x=log2FoldChange, y=-log10(pvalue),
+           label=label,color=ColorCode))+
+    geom_point()+geom_text_repel(max.overlaps = 500)+
+    facet_wrap(~SampleType, scales='free_x')+
+    scale_color_manual('', values=cbPalette_volc, na.translate=FALSE)+
+    theme_classic()+xlab('\n \n log2 Fold change ')+
+    theme(axis.line.x = element_line(arrow = 
+                                         grid::arrow(length = unit(0.3, "cm"), ends = "both")))+
+    theme(legend.position='bottom')
+
+ggsave(taxa_volc, filename=file.path(main.out, 'Figure5.pdf'), units=c('in'), width=18, height=8)
+
+
 
 cbPalette_volc=cbPalette_bar=c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "purple", "#CC79A7", "#00FF00", "#000000")
 
@@ -467,14 +776,14 @@ fig4b_opt2=ggplot(r4, aes(x=fct_reorder(PathAnnotation_01_3, n), y=n_enrich))+ge
 fig4=plot_grid(fig4a, fig4b, rel_widths=c(0.6, 0.4))
 fig4_opt2=plot_grid(fig4a, fig4b_opt2, rel_widths=c(0.6, 0.4)) 
 
-ggsave(fig4, filename=file.path(main.out, 'Figure4.pdf'), units=c('in'), width=18, height=8)
-ggsave(fig4_opt2, filename=file.path(main.out, 'Figure4_opt2.pdf'), units=c('in'), width=18, height=10)
+ggsave(fig4, filename=file.path(main.out, 'Figure6.pdf'), units=c('in'), width=18, height=8)
+ggsave(fig4_opt2, filename=file.path(main.out, 'Figure6_opt2.pdf'), units=c('in'), width=18, height=10)
 
-cairo_ps(file.path(main.out, 'Figure4.eps'), family='Arial', width=18, height=10)
+cairo_ps(file.path(main.out, 'Figure6.eps'), family='Arial', width=18, height=10)
 fig4
 dev.off()
 
-cairo_ps(file.path(main.out, 'Figure4_opt2.eps'), family='Arial', width=18, height=10)
+cairo_ps(file.path(main.out, 'Figure6_opt2.eps'), family='Arial', width=18, height=10)
 fig4_opt2
 dev.off()
 

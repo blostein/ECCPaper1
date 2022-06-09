@@ -133,9 +133,13 @@ load(file.path(data.out, 'phyloseq', 'phyasv_truesamples.Rdata'))
 alpha<-estimate_richness(ps_truesamples)
 alpha$FoxCavID=rownames(alpha)
 smut<- microbiome::transform(ps_truesamples, 'compositional') %>% 
-  subset_taxa(Species=="mutans")%>%psmelt()%>%
-  mutate(smutAbundance=Abundance, smutPrevalence=ifelse(Abundance>0, "Yes", "No"))%>%
-  select(Sample, COHRAID, FoxCavID,smutAbundance, smutPrevalence)
+  subset_taxa(Species%in%c("mutans", 'wiggsiae', 'sobrinus'))%>%
+  psmelt()%>%
+  mutate(Prevalence=ifelse(Abundance>0, 'Yes', 'No'), 
+         SciName=glue::glue("{Genus}_{Species}"))%>%
+  select(Sample, COHRAID, FoxCavID, SciName, Abundance, Prevalence)%>%
+  pivot_wider(names_from=c(SciName), 
+              values_from = c(Abundance, Prevalence))
 diversity_smutans=left_join(alpha, smut)
 saveRDS(diversity_smutans, file=file.path(data.out, 'phyloseq', 'diversityandsmut.Rds'))
 

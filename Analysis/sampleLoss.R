@@ -272,22 +272,22 @@ samplehist2<-MetaVisit %>%
   theme(rect = element_rect(fill = "transparent") # all rectangles
   )+theme(axis.text.x=element_blank())+theme(axis.title.x = element_blank())+theme(plot.margin = unit(c(2, 0, -1.5, 0), "cm"))
 
-d_tooth_file<-file.path("~/Downloads/noun_Decayed Tooth_970447.png")
-h_tooth_file<-file.path("~/Downloads/noun_Tooth_970480.png")
-
-
-myt <- ttheme_minimal(core = list(fg_params=list(hjust = 1, x=1, cex=1.3),                 bg_params=list(fill=c("lightgrey", "grey"))), 
-                      colhead=list(fg_params=list(cex=1.3)),rowhead=list(fg_params=list(cex=1.3)))
-
-
-t1<-tableGrob(sample_table2, theme=myt)
-t1<-gtable_add_grob(t1, grobs = rectGrob(gp = gpar(fill = NA, lwd = 4)),t = 1, b = 1, l = 2, r = ncol(t1))
-
-x1=0.735
-y1= 1.03; y2=y1-0.055; y3=y1-0.07; y4=y1-0.12
-h1<-plot_grid(sample_hist, t1, ncol=1)
-h1a<-plot_grid(samplehist2, t1, ncol=1)
-h2<-h1+draw_image(d_tooth_file, x = x1, y = y1, hjust = 1, vjust = 1, width = 0.07, height = 0.15)+draw_image(h_tooth_file, x = x1, y = y2, hjust = 1, vjust = 1, width = 0.07, height = 0.15)+annotate("segment", x = x1-0.05, xend = 0.3, y = y3, yend = y3, colour = "darkorange3", size=1, alpha=0.6, arrow=arrow())+annotate("segment", x = x1-0.05, xend = 0.3, y = y4, yend = y4, colour = "royalblue3", size=1, alpha=0.6, arrow=arrow())
-h3<-h2+annotate('text', x=x1, y=y1-0.11, label='1) For ECC cases at each visit, \n (incident visit) select subsample of \n children who remained caries-free \n at that age (controls)', hjust=0)+annotate('text', x=0.3, y=0.84, label='2) Sequence (16S-V4) all available \n prior saliva samples up to and \n including the incident visit', hjust=0)+annotate('text', x=x1+0.03, y=y1-0.3, label='3) For subsample of cases & \n controls, sequence (WGS) \n       incident visit saliva \n           & plaque samples', hjust=0)
+# d_tooth_file<-file.path("~/Downloads/noun_Decayed Tooth_970447.png")
+# h_tooth_file<-file.path("~/Downloads/noun_Tooth_970480.png")
+# 
+# 
+# myt <- ttheme_minimal(core = list(fg_params=list(hjust = 1, x=1, cex=1.3),                 bg_params=list(fill=c("lightgrey", "grey"))), 
+#                       colhead=list(fg_params=list(cex=1.3)),rowhead=list(fg_params=list(cex=1.3)))
+# 
+# 
+# t1<-tableGrob(sample_table2, theme=myt)
+# t1<-gtable_add_grob(t1, grobs = rectGrob(gp = gpar(fill = NA, lwd = 4)),t = 1, b = 1, l = 2, r = ncol(t1))
+# 
+# x1=0.735
+# y1= 1.03; y2=y1-0.055; y3=y1-0.07; y4=y1-0.12
+# h1<-plot_grid(sample_hist, t1, ncol=1)
+# h1a<-plot_grid(samplehist2, t1, ncol=1)
+# h2<-h1+draw_image(d_tooth_file, x = x1, y = y1, hjust = 1, vjust = 1, width = 0.07, height = 0.15)+draw_image(h_tooth_file, x = x1, y = y2, hjust = 1, vjust = 1, width = 0.07, height = 0.15)+annotate("segment", x = x1-0.05, xend = 0.3, y = y3, yend = y3, colour = "darkorange3", size=1, alpha=0.6, arrow=arrow())+annotate("segment", x = x1-0.05, xend = 0.3, y = y4, yend = y4, colour = "royalblue3", size=1, alpha=0.6, arrow=arrow())
+# h3<-h2+annotate('text', x=x1, y=y1-0.11, label='1) For ECC cases at each visit, \n (incident visit) select subsample of \n children who remained caries-free \n at that age (controls)', hjust=0)+annotate('text', x=0.3, y=0.84, label='2) Sequence (16S-V4) all available \n prior saliva samples up to and \n including the incident visit', hjust=0)+annotate('text', x=x1+0.03, y=y1-0.3, label='3) For subsample of cases & \n controls, sequence (WGS) \n       incident visit saliva \n           & plaque samples', hjust=0)
 
 
