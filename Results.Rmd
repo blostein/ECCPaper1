@@ -963,27 +963,26 @@ taxa_of_interest=c('Neisseria perflava', 'Neisseria mucosa', 'Haemophilus parain
                    'Lachnoanaerobaculum orale', 
                    'Veillonella dispar', 
                    'Veillonella parvula')
-t3=t3%>%
-  mutate(label=ifelse(Taxa %in% taxa_of_interest & padj<0.05, Taxa,
-                      ifelse((-log10(pvalue)>10)|
-                               (-log10(pvalue)>10 & SampleType=='saliva') |
-                               (SampleType=='saliva' & log2FoldChange < -2),
-                             Taxa, '')))%>%
-  mutate(xax_lab='log2(FoldChange)')
+
+t3=t3 %>% mutate(label=case_when(Taxa %in% taxa_of_interest & padj<0.05 ~ Taxa, 
+                              -log10(pvalue)>10 ~ Taxa, 
+                              SampleType=='saliva' & -log10(pvalue)>5 ~ Taxa,
+                              TRUE ~ ''))
 
 taxa_volc=t3%>%
   filter(Taxa!='Unmapped')%>%
   ggplot(aes(x=log2FoldChange, y=-log10(pvalue),
              label=label,color=ColorCode))+
     geom_point()+
-    geom_text_repel(max.overlaps = 500)+
-    facet_grid(xax_lab~SampleType, scales='free_x')+
+    geom_text_repel(max.overlaps = 500, , fontface = "italic")+
+    facet_grid(.~SampleType, scales='free_x')+
     scale_color_manual('Significant genera', values=cbPalette_volc, na.translate=FALSE)+
     theme_classic()+
     xlab('\n log2 Fold change')+
     theme(axis.line.x = element_line(arrow = 
                                          grid::arrow(length = unit(0.3, "cm"), ends = "both")))+
-    theme(legend.position='bottom')
+    theme(legend.position='bottom')+
+  theme(legend.text=element_text(face='italic'))
 
 ggsave(taxa_volc, filename=file.path(main.out, 'Figure7.pdf'), units=c('in'), width=18, height=8)
 ggsave(taxa_volc, filename=file.path(main.out, 'Figure7.eps'), units=c('in'), width=18, height=8)
