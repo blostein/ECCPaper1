@@ -12,7 +12,13 @@ na_codes <- function(x, ...) {
   x[x %in% c(...)] <- NA
   x
 }
-
+#function for fct with case_when
+fct_case_when <- function(...) {
+  args <- as.list(match.call())
+  levels <- sapply(args[-1], function(f) f[[3]])  # extract RHS of formula
+  levels <- levels[!is.na(levels)]
+  factor(dplyr::case_when(...), levels=levels)
+}
 #############Read in datasets###############################################################
 USCUR<-read.csv(file.path(meta.data, "USCURPostnatal.csv"))
 Postnatal<-read.csv(file.path(meta.data, "DFTandPostnatal.csv"))
@@ -128,8 +134,9 @@ MetaVisit$COHRAID<-paste(MetaVisit$BabySubjectID, '-', MetaVisit$Visit, sep='')
 MetaVisit %>% filter(CaseStatus=="Control (post-incident visit)" & Decay=="Decay present (d1ft>0)") %>% select(BabySubjectID, IncidentVisit, Visit, Decay, Prim_d1ft) %>% unique()
 EverDecay<-MetaVisit %>% filter(Visit<=10 & Prim_d1ft>0)%>%pull(BabySubjectID)%>%unique()
 MetaVisit$DecayBy10=ifelse(MetaVisit$BabySubjectID %in% EverDecay, 'Yes', 'No')
-#MetaVisit saliva pH
-MetaVisit$SalivapH=ifelse(MetaVisit$SalivapH<2.5, NA, MetaVisit$SalivapH)
+#MetaVisit saliva pH, 
+MetaVisit$SalivapH_original=MetaVisit$SalivapH
+MetaVisit$SalivapH=ifelse(MetaVisit$SalivapH<5.5 | MetaVisit$SalivapH>=8, NA, MetaVisit$SalivapH)
 dir.create(file.path(data.out, 'Metadata'))
 #add foxcavid 
 load(file.path(data.out, 'phyloseq', 'phyasv_truesamples.Rdata'))
@@ -267,8 +274,82 @@ test<-MetaVisit %>% filter(Visit<=10 & HasCleanSample==T & Visit<=IncidentVisit)
 weirdIDs<-ps_truesamples@sam_data$COHRAID[!(ps_truesamples@sam_data$COHRAID %in% test)]
 weirdPerson<-gsub('-.*', '', weirdIDs, )%>%unique()
 MetaVisit$IncidentVisit2<-ifelse(MetaVisit$BabySubjectID == weirdPerson, 10, MetaVisit$IncidentVisit)
+# noticed the incident visit in CasePrime and ControlPrime was wrong for two kids (should be 9, but recorded as 10)
+# this will fix that 
+case_incorrect_incident_visit=MetaVisit %>% filter(CaseEver=='Case')%>%group_by(BabySubjectID)%>%filter(Prim_d1ft>0)%>%arrange(AgeAtExamMonths)%>%slice(n=1)%>%select(BabySubjectID, Visit, IncidentVisit2)%>%filter(Visit!=IncidentVisit2)%>%mutate(IncidentVisit2_new=Visit)
+MetaVisit=MetaVisit %>% 
+  left_join(case_incorrect_incident_visit%>%
+              select(BabySubjectID, IncidentVisit2_new), by='BabySubjectID')%>%
+  mutate(IncidentVisit2_new=case_when(is.na(IncidentVisit2_new)~IncidentVisit2, 
+                                      !is.na(IncidentVisit2_new)~IncidentVisit2_new))
+
+## USCUR data set (call data set) - create matching variable for approximate visit
+USCUR = USCUR %>% 
+  mutate(PhoneCall=fct_case_when(PhCall == 1~'10 wk call', 
+                             PhCall == 2~'6 mo call', 
+                             PhCall==3~'12 mo call', 
+                             PhCall==4~'18 mo call', 
+                             PhCall==5~'24 mo call', 
+                             PhCall==6~'30 mo call', 
+                             PhCall==7~'36 mo call', 
+                             PhCall==8~'42 mo call', 
+                             PhCall==9~'48 mo call', 
+                             PhCall==10~'54 mo call', 
+                             PhCall==11~'60 mo call', 
+                             PhCall==12~'66 mo call', 
+                             PhCall==13~'72 mo call'), 
+                          levels=c(), 
+         Visit = fct_case_when(PhoneCall == "10 wk call" ~ 3,
+                                  PhoneCall == "6 mo call" ~ 4, 
+                                  PhoneCall == "12 mo call" ~ 5,
+                                  PhoneCall == "24 mo call" ~7,
+                                  PhoneCall == "36 mo call" ~8,
+                                  PhoneCall == "48 mo call" ~9,
+                                  PhoneCall == "60 mo call" ~10))
+
+
+ffq_labels=read.csv("~/Downloads/ffq_labels.csv")
+ffq_labels=ffq_labels %>% 
+  filter(Var!='')%>%
+  mutate(Var=str_remove(Var, ' '))
+
+ffq_labels=setNames(as.character(ffq_labels$Label), ffq_labels$Var)
+
+## USCUR - relabel ffq variables 
+USCUR = USCUR %>% 
+  mutate(across((contains('Q38') & !contains('Sweet'))|contains('Q43'),
+                ~factor(case_when(.x==1~'Never or once', 
+                                     .x==2~'Every few days', 
+                                     .x==3~'Once a day', 
+                                     .x==4~'Several times a day'), 
+                           levels=c('Never or once', 'Every few days', 
+                                    'Once a day', 'Several times a day'))))%>%
+  mutate(Q42_BabyFood=case_when(Q42_BabyFood==1~'Yes, within the past 6 months', 
+                                Q42_BabyFood==2~'No', 
+                                Q42_BabyFood==4~'Yes, since longer than 6 months ago'), 
+         WipeTeeth=case_when((Q48a_WipeTeeth==1 | Q48f_BrushSelf==1) & Q48c_Toothpaste==1 ~ 'Brushes/Wipes teeth, with toothpaste', 
+                             (Q48a_WipeTeeth==1 | Q48f_BrushSelf==1) & Q48c_Toothpaste==2 ~ 'Brushes/Wipes teeth, without toothpaste', 
+                             (Q48a_WipeTeeth==2 | Q48f_BrushSelf==2)~ 'Does not brush/wipe teeth'))
+
+label(USCUR) = as.list(ffq_labels[match(names(USCUR), names(ffq_labels))])
+
+#filter to just the USCUR data we want 
+my_uscur = USCUR %>% 
+  select(MotherSubjectID, BabySubjectID, 
+         Site, PhCall, CallDate, PhoneCall, Visit, 
+         contains('Q43'), contains('Q38'), contains('Q42'), WipeTeeth)%>%
+  select(-contains('ColdCereals'), -contains('Pizza'), 
+         -contains('JuiceWat'))
+
+#remove labels from id variables
+my_uscur = my_uscur %>% 
+  mutate(across(contains('SubjectID'), ~as.integer(.x)), 
+         Site=as.character(Site), Visit=as.numeric(as.character(Visit)))
+
+
 #save MetaVisit
 save(MetaVisit, file=file.path(data.out, 'Metadata', 'MetaVisit.Rdata'))
+save(my_uscur, file=file.path(data.out, 'Metadata', 'myuscur.Rdata'))
 
 
 

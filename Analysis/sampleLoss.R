@@ -1,4 +1,6 @@
-
+MetaVisit = MetaVisit %>% 
+  mutate(IncidentVisit2_old=IncidentVisit2, 
+         IncidentVisit2=IncidentVisit2_new)
 #all BabySubjectIDs & Unique Person IDs for tracking 
 unique_kids_n=MetaVisit %>%select(BabySubjectID)%>%unique()%>%nrow()
 unique_ids_n=MetaVisit%>%select(UniquePersonID)%>%unique()%>%nrow()
